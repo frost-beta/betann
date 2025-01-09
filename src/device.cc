@@ -1,5 +1,6 @@
 #include "src/device.h"
 
+#include <stdexcept>
 #include <string>
 
 namespace betann {

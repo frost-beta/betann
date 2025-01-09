@@ -6,12 +6,6 @@ project(betann)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Do not append a sub-dir for multi-config generators like MSVC and XCode.
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
-    CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
-    CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
-    CMAKE_LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
-
 # Define the BetaNN library.
 add_library(betann STATIC)
 target_sources(betann PRIVATE src/device.cc
@@ -29,7 +23,6 @@ set(DAWN_USE_WINDOWS_UI OFF)
 set(DAWN_BUILD_SAMPLES OFF)
 set(TINT_BUILD_CMD_TOOLS OFF)
 set(TINT_BUILD_TESTS OFF)
-set(DAWN_ENABLE_D3D12 OFF)  # TODO(zcbenz): remove this and fix CI
 add_subdirectory(dawn)
 target_link_libraries(betann PRIVATE dawn::dawn_common
                                      dawn::dawn_native

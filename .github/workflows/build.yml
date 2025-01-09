@@ -37,10 +37,25 @@ jobs:
         id: cpu-cores
 
       - name: Create project
-        run: cmake . -Bbuild -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        run: >
+          cmake
+          -S .
+          -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build
-        run: cmake --build build -j ${{ steps.cpu-cores.outputs.count }}
+        run: >
+          cmake
+          --build build
+          --config Release
+          -j ${{ steps.cpu-cores.outputs.count }}
 
-      - name: Test
+      - name: Test (POSIX)
+        if: matrix.os != 'win'
         run: ./build/hello_world
+
+      - name: Test (Windows)
+        if: matrix.os == 'win'
+        run: ./build/Release/hello_world
