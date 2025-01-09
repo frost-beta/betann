@@ -1,5 +1,7 @@
 #include "src/device.h"
 
+#include <string>
+
 namespace betann {
 
 Device::Device() {

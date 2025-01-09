@@ -29,6 +29,7 @@ set(DAWN_USE_WINDOWS_UI OFF)
 set(DAWN_BUILD_SAMPLES OFF)
 set(TINT_BUILD_CMD_TOOLS OFF)
 set(TINT_BUILD_TESTS OFF)
+set(DAWN_ENABLE_D3D12 OFF)  # TODO(zcbenz): remove this and fix CI
 add_subdirectory(dawn)
 target_link_libraries(betann PRIVATE dawn::dawn_common
                                      dawn::dawn_native
