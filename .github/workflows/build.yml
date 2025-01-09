@@ -32,18 +32,41 @@ jobs:
         with:
           key: ccache-${{ matrix.os }}-${{ matrix.arch }}
 
+      - name: Install Windows SDK
+        if: matrix.os == 'win'
+        uses: GuillaumeFalourd/setup-windows10-sdk-action@v2
+        with:
+          sdk-version: 22621
+
+      - name: Install ninja
+        if: matrix.os == 'win'
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
       - name: Get number of CPU cores
         uses: SimenB/github-actions-cpu-cores@v2
         id: cpu-cores
 
-      - name: Create project
+      - name: Create project (Posix)
+        if: matrix.os != 'win'
         run: >
           cmake
           -S .
           -B build
-          -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_C_COMPILER_LAUNCHER=ccache
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Create project (Windows)
+        if: matrix.os == 'win'
+        run: >
+          cmake
+          -S .
+          -B build
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DCMAKE_BUILD_TYPE=Release
+          -G Ninja
+          -DCMAKE_SYSTEM_VERSION="10.0.22621.0"
 
       - name: Build
         run: >
@@ -52,7 +75,7 @@ jobs:
           --config Release
           -j ${{ steps.cpu-cores.outputs.count }}
 
-      - name: Test (POSIX)
+      - name: Test (Posix)
         if: matrix.os != 'win'
         run: ./build/hello_world
 
