@@ -46,39 +46,37 @@ jobs:
         uses: SimenB/github-actions-cpu-cores@v2
         id: cpu-cores
 
-      - name: Create project (Posix)
+      - name: Build (Posix)
         if: matrix.os != 'win'
-        run: >
-          cmake
-          -S .
-          -B build
-          -DCMAKE_C_COMPILER_LAUNCHER=ccache
-          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-          -DCMAKE_BUILD_TYPE=Release
+        run: |
+          cmake -S . \
+                -B build \
+                -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                -DCMAKE_BUILD_TYPE=Release
 
-      - name: Create project (Windows)
+          cmake --build build -j ${{ steps.cpu-cores.outputs.count }}
+
+      - name: Build (Windows)
         if: matrix.os == 'win'
-        run: >
-          cmake
-          -S .
-          -B build
-          -DCMAKE_C_COMPILER_LAUNCHER=ccache
-          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-          -DCMAKE_BUILD_TYPE=Release
-          -G Ninja
-          -DCMAKE_SYSTEM_VERSION="10.0.22621.0"
+        shell: cmd
+        run: |
+          pushd "C:\Program Files (x86)\Microsoft Visual Studio\Installer\"
+          for /f "delims=" %%x in ('.\vswhere.exe -latest -property InstallationPath') do set VSPATH=%%x
+          popd
+          call "%VSPATH%\VC\Auxiliary\Build\vcvarsall.bat" ${{ matrix.arch }}
 
-      - name: Build
-        run: >
-          cmake
-          --build build
-          --config Release
-          -j ${{ steps.cpu-cores.outputs.count }}
+          cmake -S . ^
+                -B build ^
+                -DCMAKE_C_COMPILER_LAUNCHER=ccache ^
+                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache ^
+                -DCMAKE_BUILD_TYPE=Release ^
+                -G Ninja ^
+                -DCMAKE_C_COMPILER=cl ^
+                -DCMAKE_CXX_COMPILER=cl ^
+                -DCMAKE_SYSTEM_VERSION="10.0.22621.0"
 
-      - name: Test (Posix)
-        if: matrix.os != 'win'
+          cmake --build build -j ${{ steps.cpu-cores.outputs.count }}
+
+      - name: Test
         run: ./build/hello_world
-
-      - name: Test (Windows)
-        if: matrix.os == 'win'
-        run: ./build/Release/hello_world
