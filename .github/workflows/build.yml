@@ -32,6 +32,12 @@ jobs:
         with:
           key: ccache-${{ matrix.os }}-${{ matrix.arch }}
 
+      - name: Install Linux dependencies
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt install -qq mesa-vulkan-drivers
+
       - name: Install Windows SDK
         if: matrix.os == 'win'
         uses: GuillaumeFalourd/setup-windows10-sdk-action@v2
