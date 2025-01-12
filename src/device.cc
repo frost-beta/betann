@@ -30,11 +30,17 @@ Device::Device() {
              const char* message) {
         if (status != wgpu::RequestAdapterStatus::Success) {
           throw std::runtime_error(
-              fmt::format("RequestAdapter failed: {0} ", message));
+              fmt::format("RequestAdapter failed: {0}", message));
         }
         adapter_ = std::move(result);
       });
   instance_.WaitAny(future, 5 * 1000);
+  // Check if there is a valid backend.
+  wgpu::AdapterInfo info;
+  if (adapter_.GetInfo(&info) != wgpu::Status::Success)
+    throw std::runtime_error("GetInfo failed.");
+  if (info.backendType == wgpu::BackendType::Null)
+    throw std::runtime_error("There is no valid backend.");
   // Synchronously request the device.
   wgpu::DeviceDescriptor device_descriptor;
   device_descriptor.SetDeviceLostCallback(
@@ -44,7 +50,7 @@ Device::Device() {
          const char* message) {
         if (reason != wgpu::DeviceLostReason::Destroyed) {
           throw std::runtime_error(
-              fmt::format("Device lost: {0} ", message));
+              fmt::format("Device lost: {0}", message));
         }
       });
   device_descriptor.SetUncapturedErrorCallback(
@@ -61,7 +67,7 @@ Device::Device() {
              const char* message) {
         if (status != wgpu::RequestDeviceStatus::Success) {
           throw std::runtime_error(
-              fmt::format("RequestDevice failed: {0} ", message));
+              fmt::format("RequestDevice failed: {0}", message));
         }
         device_ = std::move(result);
       });
