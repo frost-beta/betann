@@ -1,7 +1,6 @@
 #include "src/device.h"
 
 #include <stdexcept>
-#include <string>
 
 #include <dawn/native/DawnNative.h>
 #include <dawn/native/Instance.h>
@@ -10,7 +9,10 @@
 namespace betann {
 
 Device::Device() {
-  std::array toggles = { "enable_immediate_error_handling" };
+  std::array toggles = {
+    "enable_immediate_error_handling",
+    "shader-f16",
+  };
   wgpu::DawnTogglesDescriptor toggles_descriptor;
   toggles_descriptor.enabledToggles = toggles.data();
   toggles_descriptor.enabledToggleCount = toggles.size();
@@ -73,9 +75,6 @@ Device::Device() {
       });
   instance_.WaitAny(future, 5 * 1000);
   queue_ = device_.GetQueue();
-  // The event used to notify the shutdown of process.
-  shutdown_event_ = InterruptEvent::Create();
-  GetEventManager()->TrackEvent(shutdown_event_);
   // The event used for interrupting ProcessPollEvents.
   CreateInterruptEvent();
   // Create a thread to poll futures.
@@ -83,7 +82,11 @@ Device::Device() {
 }
 
 Device::~Device() {
-  GetEventManager()->SetFutureReady(shutdown_event_.Get());
+  {
+    std::lock_guard lock(interrup_mutext_);
+    shutdown_ = true;
+    GetEventManager()->SetFutureReady(interrupt_event_.Get());
+  }
   polling_thread_.join();
 }
 
@@ -114,8 +117,8 @@ wgpu::Buffer Device::CreateBuffer(wgpu::BufferUsage usage, size_t size) {
   return device_.CreateBuffer(&descriptor);
 }
 
-wgpu::Buffer Device::CreateBuffer(wgpu::BufferUsage usage, size_t size,
-                                  void* data) {
+wgpu::Buffer Device::CreateBufferFromData(wgpu::BufferUsage usage, size_t size,
+                                          void* data) {
   wgpu::BufferDescriptor descriptor;
   descriptor.usage = usage;
   descriptor.size = size;
@@ -162,14 +165,71 @@ void Device::ReadStagingBuffer(const wgpu::Buffer& buffer,
   WakeUpPollingThread();
 }
 
+const wgpu::ShaderModule& Device::CreateShaderModule(const char* name,
+                                                     const char* source) {
+  auto it = modules_.find(name);
+  if (it != modules_.end())
+    return it->second;
+  wgpu::ShaderSourceWGSL wgsl;
+  wgsl.code = source;
+  wgpu::ShaderModuleDescriptor descriptor;
+  descriptor.label = name;
+  descriptor.nextInChain = &wgsl;
+  return modules_[name] = device_.CreateShaderModule(&descriptor);
+}
+
+const wgpu::ComputePipeline& Device::CreateKernel(
+    const wgpu::ShaderModule& shader,
+    const char* entryPoint) {
+  DAWN_ASSERT(entryPoint);
+  auto key = std::make_pair(shader.Get(), std::string(entryPoint));
+  auto it = kernels_.find(key);
+  if (it != kernels_.end())
+    return it->second;
+  wgpu::ComputePipelineDescriptor descriptor;
+  descriptor.compute.module = shader;
+  descriptor.compute.entryPoint = entryPoint;
+  return kernels_[key] = device_.CreateComputePipeline(&descriptor);
+}
+
+wgpu::BindGroup Device::CreateBindGroup(
+    const wgpu::ComputePipeline& kernel,
+    std::initializer_list<wgpu::Buffer> buffers) {
+  std::vector<wgpu::BindGroupEntry> entries;
+  uint32_t index = 0;
+  for (const wgpu::Buffer& buffer : buffers) {
+    wgpu::BindGroupEntry entry;
+    entry.binding = index++;
+    entry.buffer = buffer;
+    entries.push_back(std::move(entry));
+  }
+  wgpu::BindGroupDescriptor descriptor;
+  descriptor.layout = kernel.GetBindGroupLayout(0);
+  descriptor.entryCount = entries.size();
+  descriptor.entries = entries.data();
+  return device_.CreateBindGroup(&descriptor);
+}
+
+void Device::RunKernel(const wgpu::ComputePipeline& kernel,
+                       const wgpu::BindGroup& bindGroup,
+                       uint32_t workgroupCountX,
+                       uint32_t workgroupCountY,
+                       uint32_t workgroupCountZ) {
+  EnsureEncoder();
+  wgpu::ComputePassEncoder pass = encoder_.BeginComputePass();
+  pass.SetPipeline(kernel);
+  pass.SetBindGroup(0, bindGroup);
+  pass.DispatchWorkgroups(workgroupCountX, workgroupCountY, workgroupCountZ);
+  pass.End();
+}
+
 void Device::EnsureEncoder() {
   if (!encoder_)
     encoder_ = device_.CreateCommandEncoder();
 }
 
 void Device::EndEncoding() {
-  if (!encoder_)
-    return;
+  DAWN_ASSERT(encoder_);
   commands_.push_back(encoder_.Finish());
   encoder_ = nullptr;
 }
@@ -193,9 +253,9 @@ void Device::WakeUpPollingThread() {
 void Device::PollingThread(Device* self) {
   while (true) {
     self->GetEventManager()->ProcessPollEvents();
-    if (self->shutdown_event_->completed)
-      break;
     std::lock_guard lock(self->interrup_mutext_);
+    if (self->shutdown_)
+      break;
     if (self->interrupt_event_->completed)
       self->CreateInterruptEvent();
   }

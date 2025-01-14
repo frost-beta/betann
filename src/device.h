@@ -1,8 +1,11 @@
 #ifndef SRC_DEVICE_H_
 #define SRC_DEVICE_H_
 
+#include <map>
 #include <mutex>
+#include <string>
 #include <thread>
+#include <vector>
 
 #include <dawn/native/EventManager.h>
 #include <dawn/webgpu_cpp.h>
@@ -18,12 +21,26 @@ class Device {
   void OnSubmittedWorkDone(std::function<void()> cb);
 
   wgpu::Buffer CreateBuffer(wgpu::BufferUsage usage, size_t size);
-  wgpu::Buffer CreateBuffer(wgpu::BufferUsage usage, size_t size, void* data);
+  wgpu::Buffer CreateBufferFromData(wgpu::BufferUsage usage, size_t size,
+                                    void* data);
   wgpu::Buffer CopyToStagingBuffer(const wgpu::Buffer& buffer);
   void CopyBufferToBuffer(const wgpu::Buffer& src, const wgpu::Buffer& dst);
   void WriteBuffer(void* data, size_t size, wgpu::Buffer* buffer);
   void ReadStagingBuffer(const wgpu::Buffer& buffer,
                          std::function<void(const void* data)> cb);
+
+  const wgpu::ShaderModule& CreateShaderModule(const char* name,
+                                               const char* source);
+  const wgpu::ComputePipeline& CreateKernel(const wgpu::ShaderModule& shader,
+                                            const char* entryPoint);
+  wgpu::BindGroup CreateBindGroup(const wgpu::ComputePipeline& kernel,
+                                  std::initializer_list<wgpu::Buffer> buffers);
+  void RunKernel(const wgpu::ComputePipeline& kernel,
+                 const wgpu::BindGroup& bindGroup,
+                 uint32_t workgroupCountX,
+                 uint32_t workgroupCountY = 1,
+                 uint32_t workgroupCountZ = 1);
+
 
  private:
   void EnsureEncoder();
@@ -55,12 +72,16 @@ class Device {
   wgpu::Device device_;
   wgpu::Queue queue_;
 
+  std::map<std::string, wgpu::ShaderModule> modules_;
+  std::map<std::pair<WGPUShaderModule, std::string>,
+           wgpu::ComputePipeline> kernels_;
+
   wgpu::CommandEncoder encoder_;
   std::vector<wgpu::CommandBuffer> commands_;
 
   std::thread polling_thread_;
-  dawn::Ref<InterruptEvent> shutdown_event_;
   std::mutex interrup_mutext_;
+  bool shutdown_ = false;
   dawn::Ref<InterruptEvent> interrupt_event_;
 };
 
