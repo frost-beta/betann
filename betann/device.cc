@@ -1,4 +1,4 @@
-#include "src/device.h"
+#include "betann/device.h"
 
 #include <stdexcept>
 
@@ -13,13 +13,13 @@ Device::Device() {
     "enable_immediate_error_handling",
     "shader-f16",
   };
-  wgpu::DawnTogglesDescriptor toggles_descriptor;
-  toggles_descriptor.enabledToggles = toggles.data();
-  toggles_descriptor.enabledToggleCount = toggles.size();
-  wgpu::InstanceDescriptor instance_descriptor;
-  instance_descriptor.features.timedWaitAnyEnable = true;
-  instance_descriptor.nextInChain = &toggles_descriptor;
-  instance_ = wgpu::CreateInstance(&instance_descriptor);
+  wgpu::DawnTogglesDescriptor togglesDescriptor;
+  togglesDescriptor.enabledToggles = toggles.data();
+  togglesDescriptor.enabledToggleCount = toggles.size();
+  wgpu::InstanceDescriptor instanceDescriptor;
+  instanceDescriptor.features.timedWaitAnyEnable = true;
+  instanceDescriptor.nextInChain = &togglesDescriptor;
+  instance_ = wgpu::CreateInstance(&instanceDescriptor);
   if (!instance_)
     throw std::runtime_error("CreateInstance failed.");
   // Synchronously request the adapter.
@@ -44,8 +44,8 @@ Device::Device() {
   if (info.backendType == wgpu::BackendType::Null)
     throw std::runtime_error("There is no valid backend.");
   // Synchronously request the device.
-  wgpu::DeviceDescriptor device_descriptor;
-  device_descriptor.SetDeviceLostCallback(
+  wgpu::DeviceDescriptor deviceDescriptor;
+  deviceDescriptor.SetDeviceLostCallback(
       wgpu::CallbackMode::AllowSpontaneous,
       [](const wgpu::Device& device,
          wgpu::DeviceLostReason reason,
@@ -55,14 +55,14 @@ Device::Device() {
               fmt::format("Device lost: {0}", message));
         }
       });
-  device_descriptor.SetUncapturedErrorCallback(
+  deviceDescriptor.SetUncapturedErrorCallback(
       [](const wgpu::Device& device,
          wgpu::ErrorType type,
          const char* message) {
         throw std::runtime_error(message);
       });
   future = adapter_.RequestDevice(
-      &device_descriptor,
+      &deviceDescriptor,
       wgpu::CallbackMode::AllowSpontaneous,
       [this](wgpu::RequestDeviceStatus status,
              wgpu::Device result,
@@ -78,16 +78,16 @@ Device::Device() {
   // The event used for interrupting ProcessPollEvents.
   CreateInterruptEvent();
   // Create a thread to poll futures.
-  polling_thread_ = std::thread(&Device::PollingThread, this);
+  pollingThread_ = std::thread(&Device::PollingThread, this);
 }
 
 Device::~Device() {
   {
-    std::lock_guard lock(polling_mutex_);
+    std::lock_guard lock(pollingMutex_);
     shutdown_ = true;
     WakeUpPollingThread();
   }
-  polling_thread_.join();
+  pollingThread_.join();
 }
 
 void Device::Flush() {
@@ -107,7 +107,7 @@ void Device::OnSubmittedWorkDone(std::function<void()> cb) {
         }
         cb();
       });
-  std::lock_guard lock(polling_mutex_);
+  std::lock_guard lock(pollingMutex_);
   futures_.insert(future.id);
   WakeUpPollingThread();
 }
@@ -165,7 +165,7 @@ void Device::ReadStagingBuffer(const wgpu::Buffer& buffer,
         cb(buffer.GetConstMappedRange());
         buffer.Unmap();
       });
-  std::lock_guard lock(polling_mutex_);
+  std::lock_guard lock(pollingMutex_);
   futures_.insert(future.id);
   WakeUpPollingThread();
 }
@@ -242,12 +242,12 @@ dawn::native::EventManager* Device::GetEventManager() {
 }
 
 void Device::CreateInterruptEvent() {
-  interrupt_event_ = InterruptEvent::Create();
-  interrupt_future_ = GetEventManager()->TrackEvent(interrupt_event_);
+  interruptEvent_ = InterruptEvent::Create();
+  interruptFuture_ = GetEventManager()->TrackEvent(interruptEvent_);
 }
 
 void Device::WakeUpPollingThread() {
-  GetEventManager()->SetFutureReady(interrupt_event_.Get());
+  GetEventManager()->SetFutureReady(interruptEvent_.Get());
 }
 
 // static
@@ -257,22 +257,22 @@ void Device::PollingThread(Device* self) {
     // waiting both for now.
     std::vector<wgpu::FutureWaitInfo> infos;
     {
-      std::lock_guard lock(self->polling_mutex_);
+      std::lock_guard lock(self->pollingMutex_);
       for (uint64_t futureID : self->futures_)
         infos.push_back({futureID});
     }
     if (infos.empty())
-      infos.push_back({self->interrupt_future_});
+      infos.push_back({self->interruptFuture_});
     wgpu::WaitStatus status = self->instance_.WaitAny(infos.size(),
                                                       infos.data(),
                                                       UINT64_MAX);
     DAWN_ASSERT(status == wgpu::WaitStatus::Success);
     self->instance_.ProcessEvents();
     {
-      std::lock_guard lock(self->polling_mutex_);
+      std::lock_guard lock(self->pollingMutex_);
       if (self->shutdown_)
         break;
-      if (self->interrupt_event_->completed)
+      if (self->interruptEvent_->completed)
         self->CreateInterruptEvent();
       for (const wgpu::FutureWaitInfo& info : infos) {
         if (info.completed)

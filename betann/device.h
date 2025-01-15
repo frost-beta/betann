@@ -1,5 +1,5 @@
-#ifndef SRC_DEVICE_H_
-#define SRC_DEVICE_H_
+#ifndef BETANN_DEVICE_H_
+#define BETANN_DEVICE_H_
 
 #include <map>
 #include <mutex>
@@ -84,14 +84,14 @@ class Device {
   wgpu::CommandEncoder encoder_;
   std::vector<wgpu::CommandBuffer> commands_;
 
-  std::thread polling_thread_;
-  std::mutex polling_mutex_;
+  std::thread pollingThread_;
+  std::mutex pollingMutex_;
   std::set<uint64_t> futures_;
   bool shutdown_ = false;
-  dawn::Ref<InterruptEvent> interrupt_event_;
-  uint64_t interrupt_future_ = 0;
+  dawn::Ref<InterruptEvent> interruptEvent_;
+  uint64_t interruptFuture_ = 0;
 };
 
 }  // namespace betann
 
-#endif  // SRC_DEVICE_H_
+#endif  // BETANN_DEVICE_H_

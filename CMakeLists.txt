@@ -8,12 +8,32 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Define the BetaNN library.
 add_library(betann STATIC)
-target_sources(betann PRIVATE src/device.cc
+target_sources(betann PRIVATE betann/device.cc
+                              betann/kernels.cc
                       PUBLIC FILE_SET HEADERS
-                             BASE_DIRS src
-                             FILES src/betann.h)
+                             BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
+                             FILES betann/betann.h
+                                   betann/binary.h
+                                   betann/device.h
+                                   betann/kernels.h)
 target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-                                         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+                                         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+                                  PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/gen")
+
+# Include WGSL sources in binary.
+set(BETANN_WGSL_SOURCES betann/wgsl/binary.wgsl
+                        betann/wgsl/utils.wgsl)
+add_custom_command(
+  OUTPUT gen/wgsl_sources.h
+  COMMAND ${CMAKE_COMMAND}
+          -DBETANN_SOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
+          -DBETANN_WGSL_SOURCES=${BETANN_WGSL_SOURCES}
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/betann/wgsl/shader2h.cmake"
+  DEPENDS betann/wgsl/bin2h.cmake
+          betann/wgsl/shader2h.cmake
+          ${BETANN_WGSL_SOURCES})
+add_custom_target(wgsl_sources DEPENDS gen/wgsl_sources.h)
+add_dependencies(betann wgsl_sources)
 
 # Use fmt.
 include(FetchContent)
