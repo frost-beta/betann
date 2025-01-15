@@ -83,9 +83,9 @@ Device::Device() {
 
 Device::~Device() {
   {
-    std::lock_guard lock(interrup_mutext_);
+    std::lock_guard lock(polling_mutex_);
     shutdown_ = true;
-    GetEventManager()->SetFutureReady(interrupt_event_.Get());
+    WakeUpPollingThread();
   }
   polling_thread_.join();
 }
@@ -97,7 +97,7 @@ void Device::Flush() {
 }
 
 void Device::OnSubmittedWorkDone(std::function<void()> cb) {
-  queue_.OnSubmittedWorkDone(
+  auto future = queue_.OnSubmittedWorkDone(
       wgpu::CallbackMode::AllowSpontaneous,
       [cb = std::move(cb)](wgpu::QueueWorkDoneStatus status) {
         if (status != wgpu::QueueWorkDoneStatus::Success) {
@@ -107,6 +107,8 @@ void Device::OnSubmittedWorkDone(std::function<void()> cb) {
         }
         cb();
       });
+  std::lock_guard lock(polling_mutex_);
+  futures_.insert(future.id);
   WakeUpPollingThread();
 }
 
@@ -149,19 +151,22 @@ void Device::WriteBuffer(void* data, size_t size, wgpu::Buffer* buffer) {
 
 void Device::ReadStagingBuffer(const wgpu::Buffer& buffer,
                                std::function<void(const void* data)> cb) {
-  buffer.MapAsync(wgpu::MapMode::Read,
-                  0,
-                  wgpu::kWholeMapSize,
-                  wgpu::CallbackMode::AllowSpontaneous,
-                  [buffer, cb=std::move(cb)](wgpu::MapAsyncStatus status,
-                                             const char* message) {
-                    if (status != wgpu::MapAsyncStatus::Success) {
-                      throw std::runtime_error(
-                          fmt::format("MapAsync failed: {0}", message));
-                    }
-                    cb(buffer.GetConstMappedRange());
-                    buffer.Unmap();
-                  });
+  auto future = buffer.MapAsync(
+      wgpu::MapMode::Read,
+      0,
+      wgpu::kWholeMapSize,
+      wgpu::CallbackMode::AllowSpontaneous,
+      [buffer, cb=std::move(cb)](wgpu::MapAsyncStatus status,
+                                 const char* message) {
+        if (status != wgpu::MapAsyncStatus::Success) {
+          throw std::runtime_error(
+              fmt::format("MapAsync failed: {0}", message));
+        }
+        cb(buffer.GetConstMappedRange());
+        buffer.Unmap();
+      });
+  std::lock_guard lock(polling_mutex_);
+  futures_.insert(future.id);
   WakeUpPollingThread();
 }
 
@@ -212,14 +217,12 @@ wgpu::BindGroup Device::CreateBindGroup(
 
 void Device::RunKernel(const wgpu::ComputePipeline& kernel,
                        const wgpu::BindGroup& bindGroup,
-                       uint32_t workgroupCountX,
-                       uint32_t workgroupCountY,
-                       uint32_t workgroupCountZ) {
+                       Size gridDim) {
   EnsureEncoder();
   wgpu::ComputePassEncoder pass = encoder_.BeginComputePass();
   pass.SetPipeline(kernel);
   pass.SetBindGroup(0, bindGroup);
-  pass.DispatchWorkgroups(workgroupCountX, workgroupCountY, workgroupCountZ);
+  pass.DispatchWorkgroups(gridDim.x, gridDim.y, gridDim.z);
   pass.End();
 }
 
@@ -239,25 +242,43 @@ dawn::native::EventManager* Device::GetEventManager() {
 }
 
 void Device::CreateInterruptEvent() {
-  DAWN_ASSERT(!interrupt_event_ || interrupt_event_->completed);
   interrupt_event_ = InterruptEvent::Create();
-  GetEventManager()->TrackEvent(interrupt_event_);
+  interrupt_future_ = GetEventManager()->TrackEvent(interrupt_event_);
 }
 
 void Device::WakeUpPollingThread() {
-  std::lock_guard lock(interrup_mutext_);
   GetEventManager()->SetFutureReady(interrupt_event_.Get());
 }
 
 // static
 void Device::PollingThread(Device* self) {
   while (true) {
-    self->GetEventManager()->ProcessPollEvents();
-    std::lock_guard lock(self->interrup_mutext_);
-    if (self->shutdown_)
-      break;
-    if (self->interrupt_event_->completed)
-      self->CreateInterruptEvent();
+    // Wait for either device, or our interrupt event, the API does not support
+    // waiting both for now.
+    std::vector<wgpu::FutureWaitInfo> infos;
+    {
+      std::lock_guard lock(self->polling_mutex_);
+      for (uint64_t futureID : self->futures_)
+        infos.push_back({futureID});
+    }
+    if (infos.empty())
+      infos.push_back({self->interrupt_future_});
+    wgpu::WaitStatus status = self->instance_.WaitAny(infos.size(),
+                                                      infos.data(),
+                                                      UINT64_MAX);
+    DAWN_ASSERT(status == wgpu::WaitStatus::Success);
+    self->instance_.ProcessEvents();
+    {
+      std::lock_guard lock(self->polling_mutex_);
+      if (self->shutdown_)
+        break;
+      if (self->interrupt_event_->completed)
+        self->CreateInterruptEvent();
+      for (const wgpu::FutureWaitInfo& info : infos) {
+        if (info.completed)
+          self->futures_.erase(info.future.id);
+      }
+    }
   }
 }
 

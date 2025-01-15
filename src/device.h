@@ -3,6 +3,7 @@
 
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -11,6 +12,12 @@
 #include <dawn/webgpu_cpp.h>
 
 namespace betann {
+
+struct Size {
+  uint32_t x = 1;
+  uint32_t y = 1;
+  uint32_t z = 1;
+};
 
 class Device {
  public:
@@ -37,9 +44,7 @@ class Device {
                                   std::initializer_list<wgpu::Buffer> buffers);
   void RunKernel(const wgpu::ComputePipeline& kernel,
                  const wgpu::BindGroup& bindGroup,
-                 uint32_t workgroupCountX,
-                 uint32_t workgroupCountY = 1,
-                 uint32_t workgroupCountZ = 1);
+                 Size gridDim);
 
 
  private:
@@ -80,9 +85,11 @@ class Device {
   std::vector<wgpu::CommandBuffer> commands_;
 
   std::thread polling_thread_;
-  std::mutex interrup_mutext_;
+  std::mutex polling_mutex_;
+  std::set<uint64_t> futures_;
   bool shutdown_ = false;
   dawn::Ref<InterruptEvent> interrupt_event_;
+  uint64_t interrupt_future_ = 0;
 };
 
 }  // namespace betann

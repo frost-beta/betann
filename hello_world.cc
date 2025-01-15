@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
       )");
   wgpu::ComputePipeline kernel = device.CreateKernel(shader, "date");
   wgpu::BindGroup bindGroup = device.CreateBindGroup(kernel, {buffer});
-  device.RunKernel(kernel, bindGroup, 1);
+  device.RunKernel(kernel, bindGroup, {1});
   device.Flush();
 
   wgpu::Buffer staging = device.CopyToStagingBuffer(buffer);
