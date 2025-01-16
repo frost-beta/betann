@@ -13,7 +13,7 @@
 
 namespace betann {
 
-struct Size {
+struct GridDims {
   uint32_t x = 1;
   uint32_t y = 1;
   uint32_t z = 1;
@@ -29,7 +29,7 @@ class Device {
 
   wgpu::Buffer CreateBuffer(wgpu::BufferUsage usage, size_t size);
   wgpu::Buffer CreateBufferFromData(wgpu::BufferUsage usage, size_t size,
-                                    void* data);
+                                    const void* data);
   wgpu::Buffer CopyToStagingBuffer(const wgpu::Buffer& buffer);
   void CopyBufferToBuffer(const wgpu::Buffer& src, const wgpu::Buffer& dst);
   void WriteBuffer(void* data, size_t size, wgpu::Buffer* buffer);
@@ -45,7 +45,7 @@ class Device {
                                   std::initializer_list<wgpu::Buffer> buffers);
   void RunKernel(const wgpu::ComputePipeline& kernel,
                  const wgpu::BindGroup& bindGroup,
-                 Size gridDim);
+                 GridDims gridDims);
 
   const wgpu::Limits& GetLimits() const { return limits_; }
 

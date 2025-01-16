@@ -9,6 +9,19 @@ namespace betann {
 
 namespace {
 
+inline const char* GetBinaryOpTypeStr(BinaryOpType type, bool largeArray) {
+  switch (type) {
+    case BinaryOpType::ScalarScalar:
+      return "ss";
+    case BinaryOpType::ScalarVector:
+      return largeArray ? "sv2" : "sv";
+    case BinaryOpType::VectorScalar:
+      return largeArray ? "vs2" : "vs";
+    case BinaryOpType::VectorVector:
+      return largeArray ? "vv2" : "vv";
+  }
+}
+
 std::string GetBinaryShaderSource(const char* op,
                                   const char* inputDType,
                                   const char* outputDType) {
@@ -19,30 +32,43 @@ std::string GetBinaryShaderSource(const char* op,
 
 }  // namespace
 
-void RunBinaryOp(Device& device,
-                 const char* type,
-                 const char* name,
-                 size_t numElements,
-                 const char* inputDType,
-                 const wgpu::Buffer& a,
-                 const wgpu::Buffer& b,
-                 const char* outputDType,
-                 const wgpu::Buffer& output) {
-  std::string kernelName = fmt::format("binary_{}_{}", type, name);
-  std::string shaderName = fmt::format("{}_{}_{}", kernelName,
-                                                   inputDType,
-                                                   outputDType);
+void BinaryOp(Device& device,
+              BinaryOpType type,
+              const char* name,
+              size_t outputSize,
+              const char* outputDType,
+              const wgpu::Buffer& output,
+              const char* inputDType,
+              const wgpu::Buffer& a,
+              const wgpu::Buffer& b) {
+  uint32_t maxThreadsPerGridDim =
+      device.GetLimits().maxComputeWorkgroupsPerDimension;
+  bool use2DGrid = outputSize > maxThreadsPerGridDim;
+  std::string kernelName = fmt::format("binary_{}_{}",
+                                       GetBinaryOpTypeStr(type, use2DGrid),
+                                       name);
+  std::string shaderName = fmt::format("{}_{}_{}",
+                                       kernelName,
+                                       inputDType,
+                                       outputDType);
   const wgpu::ShaderModule& shader = device.CreateShaderModule(
       shaderName.c_str(),
       [&]() { return GetBinaryShaderSource(name, inputDType, outputDType); });
   const wgpu::ComputePipeline& kernel = device.CreateKernel(
       shader,
       kernelName.c_str());
-  float workgroupSize = 256;
-  uint32_t workgroupsCount = std::ceil(numElements / workgroupSize);
+  uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
+  GridDims gridDims;
+  if (use2DGrid) {
+    gridDims.x =
+        std::floor(maxThreadsPerGridDim / static_cast<float>(workgroupSize));
+    gridDims.y = std::ceil(outputSize / static_cast<float>(gridDims.x));
+  } else {
+    gridDims.x = std::ceil(outputSize / static_cast<float>(workgroupSize));
+  }
   device.RunKernel(kernel,
                    device.CreateBindGroup(kernel, {a, b, output}),
-                   {workgroupsCount});
+                   gridDims);
 }
 
 }  // namespace betann

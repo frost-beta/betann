@@ -99,8 +99,12 @@ Device::~Device() {
 
 void Device::Flush() {
   EndEncoding();
-  queue_.Submit(commands_.size(), commands_.data());
-  commands_.clear();
+  if (commands_.empty()) {
+    instance_.ProcessEvents();
+  } else {
+    queue_.Submit(commands_.size(), commands_.data());
+    commands_.clear();
+  }
 }
 
 void Device::OnSubmittedWorkDone(std::function<void()> cb) {
@@ -124,7 +128,7 @@ wgpu::Buffer Device::CreateBuffer(wgpu::BufferUsage usage, size_t size) {
 }
 
 wgpu::Buffer Device::CreateBufferFromData(wgpu::BufferUsage usage, size_t size,
-                                          void* data) {
+                                          const void* data) {
   wgpu::BufferDescriptor descriptor;
   descriptor.usage = usage;
   descriptor.size = size;
@@ -219,12 +223,12 @@ wgpu::BindGroup Device::CreateBindGroup(
 
 void Device::RunKernel(const wgpu::ComputePipeline& kernel,
                        const wgpu::BindGroup& bindGroup,
-                       Size gridDim) {
+                       GridDims gridDims) {
   EnsureEncoder();
   wgpu::ComputePassEncoder pass = encoder_.BeginComputePass();
   pass.SetPipeline(kernel);
   pass.SetBindGroup(0, bindGroup);
-  pass.DispatchWorkgroups(gridDim.x, gridDim.y, gridDim.z);
+  pass.DispatchWorkgroups(gridDims.x, gridDims.y, gridDims.z);
   pass.End();
 }
 

@@ -80,4 +80,4 @@ jobs:
           cmake --build build -j ${{ steps.cpu-cores.outputs.count }}
 
       - name: Test
-        run: ./build/hello_world
+        run: ./build/betann_tests

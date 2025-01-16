@@ -7,15 +7,22 @@
 
 namespace betann {
 
-void RunBinaryOp(Device& device,
-                 const char* type,
-                 const char* name,
-                 size_t numElements,
-                 const char* inputDType,
-                 const wgpu::Buffer& a,
-                 const wgpu::Buffer& b,
-                 const char* outputDType,
-                 const wgpu::Buffer& output);
+enum class BinaryOpType {
+  ScalarScalar,
+  ScalarVector,
+  VectorScalar,
+  VectorVector,
+};
+
+void BinaryOp(Device& device,
+              BinaryOpType type,
+              const char* name,
+              size_t outputSize,
+              const char* outputDType,
+              const wgpu::Buffer& output,
+              const char* inputDType,
+              const wgpu::Buffer& a,
+              const wgpu::Buffer& b);
 
 }  // namespace betann
 

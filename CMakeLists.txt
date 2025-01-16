@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.23)
 
 project(betann)
 
+option(BETANN_BUILD_TESTS "Build BetaNN's tests" ON)
+
 # Use C++17.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,7 +22,7 @@ target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURC
                                          $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
                                   PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/gen")
 
-# Include WGSL sources in binary.
+# Embed WGSL sources in binary.
 set(BETANN_WGSL_SOURCES betann/wgsl/binary.wgsl
                         betann/wgsl/utils.wgsl)
 add_custom_command(
@@ -68,5 +70,14 @@ DawnJSONGenerator(TARGET "webgpu_dawn_native_proc"
 target_sources(betann PRIVATE ${WEBGPU_DAWN_NATIVE_PROC_GEN_SOURCES})
 
 # Build tests.
-add_executable(hello_world hello_world.cc)
-target_link_libraries(hello_world PRIVATE betann)
+if (BETANN_BUILD_TESTS)
+  FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.15.2
+    EXCLUDE_FROM_ALL)
+  FetchContent_MakeAvailable(googletest)
+  add_executable(betann_tests tests/binary_tests.cc)
+  target_link_libraries(betann_tests PRIVATE betann
+                                             GTest::gtest_main)
+endif()
