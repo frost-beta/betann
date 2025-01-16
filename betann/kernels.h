@@ -17,10 +17,6 @@ void RunBinaryOp(Device& device,
                  const char* outputDType,
                  const wgpu::Buffer& output);
 
-std::string GetBinaryShaderSource(const char* op,
-                                  const char* inputDType,
-                                  const char* outputDType);
-
 }  // namespace betann
 
 #endif  // BETANN_KERNELS_H_

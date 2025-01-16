@@ -7,6 +7,18 @@
 
 namespace betann {
 
+namespace {
+
+std::string GetBinaryShaderSource(const char* op,
+                                  const char* inputDType,
+                                  const char* outputDType) {
+  constexpr std::string_view source(&wgsl_source_binary.front(),
+                                    wgsl_source_binary.size());
+  return absl::Substitute(source, op, inputDType, outputDType);
+}
+
+}  // namespace
+
 void RunBinaryOp(Device& device,
                  const char* type,
                  const char* name,
@@ -31,14 +43,6 @@ void RunBinaryOp(Device& device,
   device.RunKernel(kernel,
                    device.CreateBindGroup(kernel, {a, b, output}),
                    {workgroupsCount});
-}
-
-std::string GetBinaryShaderSource(const char* op,
-                                  const char* inputDType,
-                                  const char* outputDType) {
-  constexpr std::string_view source(&wgsl_source_binary.front(),
-                                    wgsl_source_binary.size());
-  return absl::Substitute(source, op, inputDType, outputDType);
 }
 
 }  // namespace betann

@@ -56,21 +56,9 @@ set(TINT_BUILD_CMD_TOOLS OFF)
 set(TINT_BUILD_TESTS OFF)
 add_subdirectory(dawn)
 target_link_libraries(betann PUBLIC dawncpp_headers
-                                    dawncpp
-                                    # Dawn's implementation.
-                                    dawn::dawn_common
-                                    dawn::dawn_native
-                                    dawn::dawn_wgpu_utils
-                                    # Exposing internal APIs.
-                                    dawn_internal_config
-                                    absl::flat_hash_map
-                                    libtint)
-
-# Use the same compiler flags due to using dawn's internal APIs.
-include(dawn/src/cmake/DawnCompilerPlatformFlags.cmake)
-if (COMPILER_IS_LIKE_GNU)
-  target_compile_options(betann PRIVATE "-fno-rtti")
-endif()
+                             PRIVATE absl::strings
+                                     dawn::dawn_common
+                                     dawn::dawn_native)
 
 # Build the procs that call dawn_native directly.
 find_package(Python3 REQUIRED)

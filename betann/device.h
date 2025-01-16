@@ -1,6 +1,7 @@
 #ifndef BETANN_DEVICE_H_
 #define BETANN_DEVICE_H_
 
+#include <condition_variable>
 #include <map>
 #include <mutex>
 #include <set>
@@ -8,8 +9,7 @@
 #include <thread>
 #include <vector>
 
-#include <dawn/native/EventManager.h>
-#include <dawn/webgpu_cpp.h>
+#include <webgpu/webgpu_cpp.h>
 
 namespace betann {
 
@@ -47,36 +47,20 @@ class Device {
                  const wgpu::BindGroup& bindGroup,
                  Size gridDim);
 
+  const wgpu::Limits& GetLimits() const { return limits_; }
 
  private:
   void EnsureEncoder();
   void EndEncoding();
-  void CreateInterruptEvent();
-  void WakeUpPollingThread();
-  dawn::native::EventManager* GetEventManager();
+  void AddFuture(const wgpu::Future& future);
 
   static void PollingThread(Device* self);
-
-  // Provide an event to interrupt WaitAny calls, due to lack of API:
-  // https://github.com/webgpu-native/webgpu-headers/issues/495
-  struct InterruptEvent final
-      : public dawn::native::EventManager::TrackedEvent {
-   public:
-    static dawn::Ref<InterruptEvent> Create();
-
-    bool completed = false;
-
-   private:
-    InterruptEvent();
-    ~InterruptEvent() override;
-
-    void Complete(dawn::EventCompletionType completionType) override;
-  };
 
   wgpu::Instance instance_;
   wgpu::Adapter adapter_;
   wgpu::Device device_;
   wgpu::Queue queue_;
+  wgpu::Limits limits_;
 
   std::map<std::string, wgpu::ShaderModule> modules_;
   std::map<std::pair<WGPUShaderModule, std::string>,
@@ -85,12 +69,16 @@ class Device {
   wgpu::CommandEncoder encoder_;
   std::vector<wgpu::CommandBuffer> commands_;
 
-  std::thread pollingThread_;
-  std::mutex pollingMutex_;
-  std::set<uint64_t> futures_;
+  // The polling thread that wait and process events.
+  std::thread thread_;
   bool shutdown_ = false;
-  dawn::Ref<InterruptEvent> interruptEvent_;
-  uint64_t interruptFuture_ = 0;
+  // Bookkeeping the futures returned by wgpu APIs.
+  std::mutex mutex_;
+  std::set<uint64_t> futures_;
+  // Hold the polling thread when there is no futures. Can be removed after this
+  // feature gets implemented in dawn:
+  // https://github.com/webgpu-native/webgpu-headers/issues/495
+  std::condition_variable hold_;
 };
 
 }  // namespace betann
