@@ -36,14 +36,9 @@ int main(int argc, char *argv[]) {
       wgpu::BufferUsage::Storage |
       wgpu::BufferUsage::CopySrc |
       wgpu::BufferUsage::CopyDst,
-      sizeof(number));
+      sizeof(float));
 
-  wgpu::ShaderModule shader = device.CreateShaderModule(
-      "tiananmen",
-      betann::GetBinaryShaderSource("add", "u32", "u32").c_str());
-  wgpu::ComputePipeline kernel = device.CreateKernel(shader, "binary_ss_add");
-  wgpu::BindGroup bindGroup = device.CreateBindGroup(kernel, {a, b, c});
-  device.RunKernel(kernel, bindGroup, {1});
+  betann::RunBinaryOp(device, "ss", "add", 1, "u32", a, b, "f32", c);
   device.Flush();
 
   wgpu::Buffer staging = device.CopyToStagingBuffer(c);
@@ -51,7 +46,7 @@ int main(int argc, char *argv[]) {
   device.ReadStagingBuffer(
       staging,
       [&](const void* data) {
-        std::cerr << *static_cast<const uint32_t*>(data) << std::endl;
+        std::cerr << *static_cast<const float*>(data) << std::endl;
         wakeup();
       });
   wait();

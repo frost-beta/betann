@@ -32,7 +32,7 @@ Device::Device() {
              const char* message) {
         if (status != wgpu::RequestAdapterStatus::Success) {
           throw std::runtime_error(
-              fmt::format("RequestAdapter failed: {0}", message));
+              fmt::format("RequestAdapter failed: {}", message));
         }
         adapter_ = std::move(result);
       });
@@ -50,10 +50,8 @@ Device::Device() {
       [](const wgpu::Device& device,
          wgpu::DeviceLostReason reason,
          const char* message) {
-        if (reason != wgpu::DeviceLostReason::Destroyed) {
-          throw std::runtime_error(
-              fmt::format("Device lost: {0}", message));
-        }
+        if (reason != wgpu::DeviceLostReason::Destroyed)
+          throw std::runtime_error(fmt::format("Device lost: {}", message));
       });
   deviceDescriptor.SetUncapturedErrorCallback(
       [](const wgpu::Device& device,
@@ -69,7 +67,7 @@ Device::Device() {
              const char* message) {
         if (status != wgpu::RequestDeviceStatus::Success) {
           throw std::runtime_error(
-              fmt::format("RequestDevice failed: {0}", message));
+              fmt::format("RequestDevice failed: {}", message));
         }
         device_ = std::move(result);
       });
@@ -102,7 +100,7 @@ void Device::OnSubmittedWorkDone(std::function<void()> cb) {
       [cb = std::move(cb)](wgpu::QueueWorkDoneStatus status) {
         if (status != wgpu::QueueWorkDoneStatus::Success) {
           throw std::runtime_error(
-              fmt::format("OnSubmittedWorkDone failed: {0}",
+              fmt::format("OnSubmittedWorkDone failed: {}",
                           static_cast<uint32_t>(status)));
         }
         cb();
@@ -158,10 +156,8 @@ void Device::ReadStagingBuffer(const wgpu::Buffer& buffer,
       wgpu::CallbackMode::AllowSpontaneous,
       [buffer, cb=std::move(cb)](wgpu::MapAsyncStatus status,
                                  const char* message) {
-        if (status != wgpu::MapAsyncStatus::Success) {
-          throw std::runtime_error(
-              fmt::format("MapAsync failed: {0}", message));
-        }
+        if (status != wgpu::MapAsyncStatus::Success)
+          throw std::runtime_error(fmt::format("MapAsync failed: {}", message));
         cb(buffer.GetConstMappedRange());
         buffer.Unmap();
       });
@@ -170,13 +166,15 @@ void Device::ReadStagingBuffer(const wgpu::Buffer& buffer,
   WakeUpPollingThread();
 }
 
-const wgpu::ShaderModule& Device::CreateShaderModule(const char* name,
-                                                     const char* source) {
+const wgpu::ShaderModule& Device::CreateShaderModule(
+    const char* name,
+    std::function<std::string()> getSource) {
   auto it = modules_.find(name);
   if (it != modules_.end())
     return it->second;
+  std::string source = getSource();
   wgpu::ShaderSourceWGSL wgsl;
-  wgsl.code = source;
+  wgsl.code = source.c_str();
   wgpu::ShaderModuleDescriptor descriptor;
   descriptor.label = name;
   descriptor.nextInChain = &wgsl;

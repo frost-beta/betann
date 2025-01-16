@@ -36,8 +36,9 @@ class Device {
   void ReadStagingBuffer(const wgpu::Buffer& buffer,
                          std::function<void(const void* data)> cb);
 
-  const wgpu::ShaderModule& CreateShaderModule(const char* name,
-                                               const char* source);
+  const wgpu::ShaderModule& CreateShaderModule(
+      const char* name,
+      std::function<std::string()> getSource);
   const wgpu::ComputePipeline& CreateKernel(const wgpu::ShaderModule& shader,
                                             const char* entryPoint);
   wgpu::BindGroup CreateBindGroup(const wgpu::ComputePipeline& kernel,
