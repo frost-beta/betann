@@ -15,7 +15,6 @@ target_sources(betann PRIVATE betann/device.cc
                       PUBLIC FILE_SET HEADERS
                              BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
                              FILES betann/betann.h
-                                   betann/binary.h
                                    betann/device.h
                                    betann/kernels.h)
 target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -23,8 +22,7 @@ target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURC
                                   PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/gen")
 
 # Embed WGSL sources in binary.
-set(BETANN_WGSL_SOURCES betann/wgsl/binary.wgsl
-                        betann/wgsl/utils.wgsl)
+set(BETANN_WGSL_SOURCES betann/wgsl/binary.wgsl)
 add_custom_command(
   OUTPUT gen/wgsl_sources.h
   COMMAND ${CMAKE_COMMAND}
@@ -77,7 +75,7 @@ if (BETANN_BUILD_TESTS)
     GIT_TAG v1.15.2
     EXCLUDE_FROM_ALL)
   FetchContent_MakeAvailable(googletest)
-  add_executable(betann_tests tests/binary_tests.cc)
+  add_executable(betann_tests tests/binary_test.cc)
   target_link_libraries(betann_tests PRIVATE betann
                                              GTest::gtest_main)
 endif()

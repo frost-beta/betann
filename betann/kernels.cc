@@ -23,11 +23,11 @@ inline const char* GetBinaryOpTypeStr(BinaryOpType type, bool largeArray) {
 }
 
 std::string GetBinaryShaderSource(const char* op,
-                                  const char* inputDType,
-                                  const char* outputDType) {
+                                  const char* inputDataType,
+                                  const char* outputDataType) {
   constexpr std::string_view source(&wgsl_source_binary.front(),
                                     wgsl_source_binary.size());
-  return absl::Substitute(source, op, inputDType, outputDType);
+  return absl::Substitute(source, op, inputDataType, outputDataType);
 }
 
 }  // namespace
@@ -36,9 +36,9 @@ void BinaryOp(Device& device,
               BinaryOpType type,
               const char* name,
               size_t outputSize,
-              const char* outputDType,
+              const char* outputDataType,
               const wgpu::Buffer& output,
-              const char* inputDType,
+              const char* inputDataType,
               const wgpu::Buffer& a,
               const wgpu::Buffer& b) {
   uint32_t maxThreadsPerGridDim =
@@ -49,11 +49,13 @@ void BinaryOp(Device& device,
                                        name);
   std::string shaderName = fmt::format("{}_{}_{}",
                                        kernelName,
-                                       inputDType,
-                                       outputDType);
+                                       inputDataType,
+                                       outputDataType);
   const wgpu::ShaderModule& shader = device.CreateShaderModule(
       shaderName.c_str(),
-      [&]() { return GetBinaryShaderSource(name, inputDType, outputDType); });
+      [&]() {
+        return GetBinaryShaderSource(name, inputDataType, outputDataType);
+      });
   const wgpu::ComputePipeline& kernel = device.CreateKernel(
       shader,
       kernelName.c_str());
