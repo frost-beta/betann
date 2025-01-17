@@ -9,17 +9,12 @@ namespace betann {
 
 template<typename T>
 inline const char* GetWgslDataType() {
-  if constexpr (std::is_same_v<T, bool>)
-    return "bool";
-  else if constexpr (std::is_same_v<T, int32_t>)
-    return "i32";
-  else if constexpr (std::is_same_v<T, uint32_t>)
-    return "u32";
-  else if constexpr (std::is_same_v<T, float>)
-    return "f32";
-  else
-    static_assert(false, "Unsupported C++ type in WGSL.");
+  static_assert(false, "Unsupported C++ type in WGSL.");
 }
+template<> inline const char* GetWgslDataType<bool>() { return "bool"; }
+template<> inline const char* GetWgslDataType<int32_t>() { return "i32"; }
+template<> inline const char* GetWgslDataType<uint32_t>() { return "u32"; }
+template<> inline const char* GetWgslDataType<float>() { return "f32"; }
 
 enum class BinaryOpType {
   ScalarScalar,

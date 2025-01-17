@@ -98,3 +98,20 @@ TEST_F(BinaryTest, SmallArrays) {
       {10.36, 10.36, 10.36});
   EXPECT_EQ(vv, std::vector<float>({89.64, 89.64, 89.64}));
 }
+
+TEST_F(BinaryTest, LargeArrays) {
+  uint32_t outputSize =
+      device_.GetLimits().maxComputeWorkgroupsPerDimension + 100;
+  std::vector<uint32_t> a(outputSize);
+  std::fill(a.begin(), a.end(), 8900);
+  std::vector<uint32_t> b(outputSize);
+  std::fill(b.begin(), b.end(), 64);
+  std::vector<float> vv = RunOp<float, uint32_t>(
+      betann::BinaryOp,
+      betann::BinaryOpType::VectorVector,
+      "add",
+      a,
+      b);
+  EXPECT_TRUE(std::all_of(vv.begin(), vv.end(),
+                          [](float i) { return i == 8964; }));
+}
