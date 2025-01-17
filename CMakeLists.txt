@@ -22,15 +22,16 @@ target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURC
                                   PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/gen")
 
 # Embed WGSL sources in binary.
-set(BETANN_WGSL_SOURCES betann/wgsl/binary.wgsl)
+set(BETANN_WGSL_SOURCES betann/wgsl/binary.wgsl
+                        betann/wgsl/binary_ops.wgsl)
+string(JOIN ":" BETANN_WGSL_SOURCES_ARG ${BETANN_WGSL_SOURCES})
 add_custom_command(
   OUTPUT gen/wgsl_sources.h
   COMMAND ${CMAKE_COMMAND}
           -DBETANN_SOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}
-          -DBETANN_WGSL_SOURCES=${BETANN_WGSL_SOURCES}
+          -DBETANN_WGSL_SOURCES=${BETANN_WGSL_SOURCES_ARG}
           -P "${CMAKE_CURRENT_SOURCE_DIR}/betann/wgsl/shader2h.cmake"
-  DEPENDS betann/wgsl/bin2h.cmake
-          betann/wgsl/shader2h.cmake
+  DEPENDS betann/wgsl/shader2h.cmake
           ${BETANN_WGSL_SOURCES})
 add_custom_target(wgsl_sources DEPENDS gen/wgsl_sources.h)
 add_dependencies(betann wgsl_sources)
@@ -75,7 +76,7 @@ if (BETANN_BUILD_TESTS)
     GIT_TAG v1.15.2
     EXCLUDE_FROM_ALL)
   FetchContent_MakeAvailable(googletest)
-  add_executable(betann_tests tests/binary_test.cc)
+  add_executable(betann_tests tests/binary_tests.cc)
   target_link_libraries(betann_tests PRIVATE betann
                                              GTest::gtest_main)
 endif()

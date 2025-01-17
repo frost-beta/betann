@@ -22,12 +22,15 @@ inline const char* GetBinaryOpTypeStr(BinaryOpType type, bool largeArray) {
   }
 }
 
-std::string GetBinaryShaderSource(const char* op,
+std::string GetShaderSourceBinary(const char* op,
                                   const char* inputDataType,
                                   const char* outputDataType) {
-  constexpr std::string_view source(&wgsl_source_binary.front(),
-                                    wgsl_source_binary.size());
-  return absl::Substitute(source, op, inputDataType, outputDataType);
+  std::string preprocessed = absl::Substitute(wgsl_source_binary,
+                                              op,
+                                              inputDataType,
+                                              outputDataType);
+  preprocessed += wgsl_source_binary_ops;
+  return preprocessed;
 }
 
 }  // namespace
@@ -54,7 +57,7 @@ void BinaryOp(Device& device,
   const wgpu::ShaderModule& shader = device.CreateShaderModule(
       shaderName.c_str(),
       [&]() {
-        return GetBinaryShaderSource(name, inputDataType, outputDataType);
+        return GetShaderSourceBinary(name, inputDataType, outputDataType);
       });
   const wgpu::ComputePipeline& kernel = device.CreateKernel(
       shader,
