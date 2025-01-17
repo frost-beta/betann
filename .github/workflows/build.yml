@@ -6,9 +6,11 @@ jobs:
   build:
     runs-on: >-
       ${{
-        (matrix.os == 'mac' && matrix.arch == 'arm64') &&
+        ((matrix.os == 'linux' && matrix.arch == 'arm64') &&
+          'ubuntu-24.04-arm' ||
+        ((matrix.os == 'mac' && matrix.arch == 'arm64') &&
           'macos-15' ||
-          (fromJson('{"linux":"ubuntu-22.04","mac":"macos-13","win":"windows-2022"}')[matrix.os])
+        (fromJson('{"linux":"ubuntu-24.04","mac":"macos-13","win":"windows-2022"}')[matrix.os])))
       }}
     continue-on-error: false
 
@@ -16,9 +18,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [linux, mac, win]
-        arch: [x64]
-        include:
-          - os: mac
+        arch: [x64, arm64]
+        exclude:
+          - os: win
+            arch: arm64
+          - os: linux
             arch: arm64
 
     steps:
