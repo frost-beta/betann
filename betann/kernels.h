@@ -9,7 +9,7 @@ namespace betann {
 
 template<typename T>
 inline const char* GetWgslDataType() {
-  static_assert(false, "Unsupported C++ type in WGSL.");
+  throw std::runtime_error("Unsupported C++ data type in WGSL.");
 }
 template<> inline const char* GetWgslDataType<bool>() { return "bool"; }
 template<> inline const char* GetWgslDataType<int32_t>() { return "i32"; }
