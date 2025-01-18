@@ -26,7 +26,8 @@ Device::Device() {
     throw std::runtime_error("CreateInstance failed.");
 
   // Synchronously request the adapter.
-  wgpu::RequestAdapterOptions options = {};
+  wgpu::RequestAdapterOptions options;
+  options.powerPreference = wgpu::PowerPreference::HighPerformance;
   wgpu::Future future = instance_.RequestAdapter(
       &options,
       wgpu::CallbackMode::AllowSpontaneous,
@@ -48,7 +49,11 @@ Device::Device() {
     throw std::runtime_error("There is no valid backend.");
 
   // Synchronously request the device.
+  wgpu::RequiredLimits requiredLimits;
+  requiredLimits.limits.maxComputeInvocationsPerWorkgroup =
+      512;  // used by 3d binary general kernel
   wgpu::DeviceDescriptor deviceDescriptor;
+  deviceDescriptor.requiredLimits = &requiredLimits;
   deviceDescriptor.SetDeviceLostCallback(
       wgpu::CallbackMode::AllowSpontaneous,
       [](const wgpu::Device& device,
@@ -200,7 +205,9 @@ const wgpu::ComputePipeline& Device::CreateKernel(
   wgpu::ComputePipelineDescriptor descriptor;
   descriptor.compute.module = shader;
   descriptor.compute.entryPoint = entryPoint;
-  return kernels_[key] = device_.CreateComputePipeline(&descriptor);
+  wgpu::ComputePipeline kernel = device_.CreateComputePipeline(&descriptor);
+  kernel.SetLabel(entryPoint);
+  return kernels_[std::move(key)] = std::move(kernel);
 }
 
 wgpu::BindGroup Device::CreateBindGroup(

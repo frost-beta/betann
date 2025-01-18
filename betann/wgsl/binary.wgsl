@@ -1,11 +1,11 @@
 alias input_dtype = $1;
 alias output_dtype = $2;
 
+override num_threads: u32 = 256;
+
 @group(0) @binding(0) var<storage, read> a: array<input_dtype>;
 @group(0) @binding(1) var<storage, read> b: array<input_dtype>;
 @group(0) @binding(2) var<storage, read_write> c: array<output_dtype>;
-
-override num_threads: u32 = 256;
 
 @compute @workgroup_size(num_threads, 1, 1)
 fn binary_ss_$0(@builtin(global_invocation_id) gid: vec3<u32>) {

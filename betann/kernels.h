@@ -34,6 +34,19 @@ void BinaryOp(Device& device,
               const wgpu::Buffer& a,
               const wgpu::Buffer& b);
 
+void BinaryOpGeneral(Device& device,
+                     const char* name,
+                     const std::vector<uint32_t>& shape,
+                     const char* outputDataType,
+                     const wgpu::Buffer& output,
+                     const char* inputDataType,
+                     const wgpu::Buffer& a,
+                     size_t aNumElements,
+                     const std::vector<uint32_t>& aStrides,
+                     const wgpu::Buffer& b,
+                     size_t bNumElements,
+                     const std::vector<uint32_t>& bStrides);
+
 }  // namespace betann
 
 #endif  // BETANN_KERNELS_H_
