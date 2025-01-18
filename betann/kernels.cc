@@ -61,7 +61,7 @@ void BinaryOp(Device& device,
               const wgpu::Buffer& b) {
   if (outputSize > UINT32_MAX) {
     throw std::runtime_error(
-        fmt::format("Number of elements ({}) exceeds maximum value.",
+        fmt::format("Number of elements ({}) exceeds maximum index.",
                     outputSize));
   }
   uint32_t maxThreadsPerGridDim =
@@ -111,18 +111,19 @@ void BinaryOpGeneral(Device& device,
   size_t outputSize = std::accumulate(shape.begin(), shape.end(),
                                       1,
                                       std::multiplies<uint32_t>());
-  if (aNumElements > INT32_MAX ||
-      bNumElements > INT32_MAX ||
-      outputSize > INT32_MAX) {
+  if (aNumElements > UINT32_MAX ||
+      bNumElements > UINT32_MAX ||
+      outputSize > UINT32_MAX) {
     throw std::runtime_error(
         fmt::format("Number of elements ({}, {}, {}) exceeds maximum index.",
                     outputSize, aNumElements, bNumElements));
   }
   size_t ndim = shape.size();
-  if (ndim > 3) {
-    throw std::runtime_error("BinaryOpGeneral supports atmost 3 dimensions.");
-  }
-  std::string kernelName = fmt::format("binary_g{}_{}", ndim, name);
+  std::string kernelName;
+  if (ndim > 3)
+    kernelName = fmt::format("binary_gn2_{}", name);
+  else
+    kernelName = fmt::format("binary_g{}_{}", ndim, name);
   std::string shaderName = fmt::format("{}_{}_{}",
                                        kernelName,
                                        inputDataType,
@@ -151,6 +152,10 @@ void BinaryOpGeneral(Device& device,
   size_t dim0 = ndim > 0 ? shape[ndim - 1] : 1;
   size_t dim1 = ndim > 1 ? shape[ndim - 2] : 1;
   size_t rest = outputSize / (dim0 * dim1);
+  if (ndim > 3) {
+    const uint32_t workPerThread = 2;
+    dim0 = (dim0 + workPerThread - 1) / workPerThread;
+  }
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
   GridDims gridDims;
   gridDims.x = std::ceil(dim0 / static_cast<float>(workgroupSize));

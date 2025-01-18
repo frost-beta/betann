@@ -191,3 +191,61 @@ TEST_F(BinaryTest, GeneralNonContiguous) {
       {0, 0, 0});
   EXPECT_EQ(noc3d, std::vector<float>({1, 3, 2, 4, 1, 3, 2, 4}));
 }
+
+TEST_F(BinaryTest, GeneralLargeArrays) {
+  std::vector<uint32_t> shape = {33, 33, 33};
+  std::vector<uint32_t> strides = {33 * 33, 33, 1};
+  size_t outputSize = std::accumulate(shape.begin(), shape.end(),
+                                      1,
+                                      std::multiplies<uint32_t>());
+  std::vector<float> a(outputSize);
+  std::fill(a.begin(), a.end(), 8);
+  std::vector<float> b(outputSize);
+  std::fill(b.begin(), b.end(), 8);
+  std::vector<uint32_t> c = RunBinaryOpGeneral<uint32_t, float>(
+      "multiply", shape, a, strides, b, strides);
+  EXPECT_TRUE(std::all_of(c.begin(), c.end(),
+                          [](uint32_t i) { return i == 64; }));
+}
+
+TEST_F(BinaryTest, General4D) {
+  std::vector<uint32_t> row = RunBinaryOpGeneral<uint32_t, uint32_t>(
+      "add",
+      {1, 1, 1, 4},
+      {1, 2, 3, 4},
+      {4, 4, 4, 1},
+      {7, 7, 3, 0},
+      {4, 4, 4, 1});
+  EXPECT_EQ(row, std::vector<uint32_t>({8, 9, 6, 4}));
+  std::vector<uint32_t> arange(16);
+  std::iota(arange.begin(), arange.end(), 1);
+  std::vector<uint32_t> cube = RunBinaryOpGeneral<uint32_t, uint32_t>(
+      "multiply",
+      {2, 2, 2, 2},
+      arange,
+      {8, 4, 2, 1},
+      std::vector<uint32_t>(16, 2),
+      {8, 4, 2, 1});
+  std::vector<uint32_t> expected(16);
+  std::transform(arange.begin(), arange.end(), expected.begin(),
+                 [](uint32_t i) { return i * 2; });
+  EXPECT_EQ(cube, expected);
+}
+
+TEST_F(BinaryTest, General4DLargeArrays) {
+  std::vector<uint32_t> shape = {33, 33, 33, 33};
+  std::vector<uint32_t> strides = {33 * 33 * 33, 33 * 33, 33, 1};
+  size_t outputSize = std::accumulate(shape.begin(), shape.end(),
+                                      1,
+                                      std::multiplies<uint32_t>());
+  std::vector<float> a(outputSize);
+  std::iota(a.begin(), a.end(), 1);
+  std::vector<float> b(outputSize);
+  std::iota(b.begin(), b.end(), 1);
+  std::vector<float> c = RunBinaryOpGeneral<float, float>(
+      "multiply", shape, a, strides, b, strides);
+  std::vector<float> expected(outputSize);
+  std::transform(a.begin(), a.end(), expected.begin(),
+                 [](float i) { return i * i; });
+  EXPECT_EQ(c, expected);
+}

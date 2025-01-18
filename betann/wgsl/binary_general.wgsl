@@ -21,8 +21,7 @@ fn binary_g1_$0(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 
 @compute @workgroup_size(num_threads, num_threads, 1)
-fn binary_g2_$0(@builtin(global_invocation_id) gid: vec3<u32>,
-                @builtin(num_workgroups) num_workgroups: vec3<u32>) {
+fn binary_g2_$0(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (gid.x >= shape[1] || gid.y >= shape[0]) {
     return;
   }
@@ -33,8 +32,7 @@ fn binary_g2_$0(@builtin(global_invocation_id) gid: vec3<u32>,
 }
 
 @compute @workgroup_size(num_threads, num_threads, num_threads)
-fn binary_g3_$0(@builtin(global_invocation_id) gid: vec3<u32>,
-                @builtin(num_workgroups) num_workgroups: vec3<u32>) {
+fn binary_g3_$0(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (gid.x >= shape[2] || gid.y >= shape[1] || gid.z >= shape[0]) {
     return;
   }
@@ -42,6 +40,42 @@ fn binary_g3_$0(@builtin(global_invocation_id) gid: vec3<u32>,
   let b_idx = gid.x * b_strides[2] + gid.y * b_strides[1] + gid.z * b_strides[0];
   let out_idx = gid.x + shape[1] * (gid.y + shape[2] * gid.z);
   c[out_idx] = $0(a[a_idx], b[b_idx]);
+}
+
+@compute @workgroup_size(num_threads, num_threads, num_threads)
+fn binary_gn2_$0(@builtin(global_invocation_id) gid: vec3<u32>) {
+  // Check boundries.
+  const work_per_thread: u32 = 2;
+  let ndim = i32(arrayLength(&shape));
+  let dim0 = shape[ndim - 1];
+  let dim1 = shape[ndim - 2];
+  var rest: u32 = 1;
+  for (var d: i32 = ndim - 3; d >= 0; d--) {
+    rest *= shape[d];
+  }
+  if (work_per_thread * gid.x >= dim0 || gid.y >= dim1 || gid.z >= rest) {
+    return;
+  }
+  // Get index in a and b.
+  var a_idx = work_per_thread * gid.x * a_strides[ndim - 1] + gid.y * a_strides[ndim - 2];
+  var b_idx = work_per_thread * gid.x * b_strides[ndim - 1] + gid.y * b_strides[ndim - 2];
+  var z_idx = gid.z;
+  for (var d: i32 = ndim - 3; d >= 0; d--) {
+    let l = z_idx % shape[d];
+    a_idx += l * a_strides[d];
+    b_idx += l * b_strides[d];
+    z_idx /= shape[d];
+  }
+  // Iterate and assign.
+  var out_idx = work_per_thread * gid.x + dim0 * (gid.y + dim1 * gid.z);
+  for (var i: u32 = 0;
+       i < work_per_thread && (work_per_thread * gid.x + i) < dim0;
+       i++) {
+    c[out_idx] = $0(a[a_idx], b[b_idx]);
+    a_idx += a_strides[ndim - 1];
+    b_idx += b_strides[ndim - 1];
+    out_idx++;
+  }
 }
 
 // include binary_ops.wgsl
