@@ -20,15 +20,6 @@ class BinaryTest : public testing::Test {
   };
 
   template<typename T>
-  wgpu::Buffer CreateBufferFromVector(const std::vector<T>& vec) {
-    wgpu::Buffer buf = device_.CreateBufferFromData(wgpu::BufferUsage::Storage,
-                                                    vec.size() * sizeof(T),
-                                                    vec.data());
-    buf.SetLabel("input");
-    return buf;
-  }
-
-  template<typename T>
   std::vector<T> ReadFromBuffer(const wgpu::Buffer& buf, size_t size) {
     wgpu::Buffer staging = device_.CopyToStagingBuffer(buf);
     device_.Flush();
@@ -50,8 +41,8 @@ class BinaryTest : public testing::Test {
                              const std::vector<I>& b) {
     size_t outputSize = std::max(a.size(), b.size());
     wgpu::Buffer output = device_.CreateBuffer(
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc,
-        outputSize * sizeof(T));
+        outputSize * sizeof(T),
+        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
     output.SetLabel("output");
     betann::BinaryOp(device_,
                      type,
@@ -60,8 +51,8 @@ class BinaryTest : public testing::Test {
                      betann::GetWgslDataType<T>(),
                      output,
                      betann::GetWgslDataType<I>(),
-                     CreateBufferFromVector<I>(a),
-                     CreateBufferFromVector<I>(b));
+                     device_.CreateBufferFromVector(a),
+                     device_.CreateBufferFromVector(b));
     device_.Flush();
     return ReadFromBuffer<T>(output, outputSize);
   }
@@ -77,8 +68,8 @@ class BinaryTest : public testing::Test {
                                         1,
                                         std::multiplies<uint32_t>());
     wgpu::Buffer output = device_.CreateBuffer(
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc,
-        outputSize * sizeof(T));
+        outputSize * sizeof(T),
+        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
     output.SetLabel("output");
     betann::BinaryOpGeneral(device_,
                             name,
@@ -86,10 +77,10 @@ class BinaryTest : public testing::Test {
                             betann::GetWgslDataType<T>(),
                             output,
                             betann::GetWgslDataType<I>(),
-                            CreateBufferFromVector<I>(a),
+                            device_.CreateBufferFromVector(a),
                             a.size(),
                             aStrides,
-                            CreateBufferFromVector<I>(b),
+                            device_.CreateBufferFromVector(b),
                             b.size(),
                             bStrides);
     device_.Flush();

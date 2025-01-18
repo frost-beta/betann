@@ -27,9 +27,18 @@ class Device {
   void Flush();
   void OnSubmittedWorkDone(std::function<void()> cb);
 
-  wgpu::Buffer CreateBuffer(wgpu::BufferUsage usage, size_t size);
-  wgpu::Buffer CreateBufferFromData(wgpu::BufferUsage usage, size_t size,
-                                    const void* data);
+  wgpu::Buffer CreateBuffer(size_t size, wgpu::BufferUsage usage);
+  wgpu::Buffer CreateBufferFromData(
+      const void* data,
+      size_t size,
+      wgpu::BufferUsage usage = wgpu::BufferUsage::Storage);
+  template<typename T>
+  wgpu::Buffer CreateBufferFromVector(
+      const std::vector<T>& vec,
+      wgpu::BufferUsage usage = wgpu::BufferUsage::Storage) {
+    return CreateBufferFromData(vec.data(), vec.size() * sizeof(T), usage);
+  }
+
   wgpu::Buffer CopyToStagingBuffer(const wgpu::Buffer& buffer);
   void CopyBufferToBuffer(const wgpu::Buffer& src, const wgpu::Buffer& dst);
   void WriteBuffer(void* data, size_t size, wgpu::Buffer* buffer);

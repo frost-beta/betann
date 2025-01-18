@@ -125,15 +125,16 @@ void Device::OnSubmittedWorkDone(std::function<void()> cb) {
       }));
 }
 
-wgpu::Buffer Device::CreateBuffer(wgpu::BufferUsage usage, size_t size) {
+wgpu::Buffer Device::CreateBuffer(size_t size, wgpu::BufferUsage usage) {
   wgpu::BufferDescriptor descriptor;
   descriptor.usage = usage;
   descriptor.size = size;
   return device_.CreateBuffer(&descriptor);
 }
 
-wgpu::Buffer Device::CreateBufferFromData(wgpu::BufferUsage usage, size_t size,
-                                          const void* data) {
+wgpu::Buffer Device::CreateBufferFromData(const void* data,
+                                          size_t size,
+                                          wgpu::BufferUsage usage) {
   wgpu::BufferDescriptor descriptor;
   descriptor.usage = usage;
   descriptor.size = size;
@@ -145,9 +146,9 @@ wgpu::Buffer Device::CreateBufferFromData(wgpu::BufferUsage usage, size_t size,
 }
 
 wgpu::Buffer Device::CopyToStagingBuffer(const wgpu::Buffer& buffer) {
-  wgpu::Buffer staging = CreateBuffer(wgpu::BufferUsage::MapRead |
-                                      wgpu::BufferUsage::CopyDst,
-                                      buffer.GetSize());
+  wgpu::Buffer staging = CreateBuffer(buffer.GetSize(),
+                                      wgpu::BufferUsage::MapRead |
+                                      wgpu::BufferUsage::CopyDst);
   CopyBufferToBuffer(buffer, staging);
   return staging;
 }
