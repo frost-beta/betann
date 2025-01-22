@@ -48,6 +48,14 @@ FetchContent_MakeAvailable(fmt)
 target_link_libraries(betann PRIVATE $<BUILD_INTERFACE:fmt::fmt-header-only>)
 
 # Link with dawn statically.
+cmake_policy(SET CMP0097 NEW)  # enable GIT_SUBMODULES
+FetchContent_Declare(
+  dawn
+  GIT_REPOSITORY https://dawn.googlesource.com/dawn
+  GIT_TAG "chromium/6972"
+  GIT_SHALLOW ON
+  GIT_SUBMODULES ""  # no submodules
+  EXCLUDE_FROM_ALL)
 set(DAWN_FETCH_DEPENDENCIES ON)
 set(DAWN_USE_GLFW OFF)
 set(DAWN_USE_X11 OFF)
@@ -56,7 +64,7 @@ set(DAWN_BUILD_SAMPLES OFF)
 set(DAWN_BUILD_MONOLITHIC_LIBRARY OFF)
 set(TINT_BUILD_CMD_TOOLS OFF)
 set(TINT_BUILD_TESTS OFF)
-add_subdirectory(dawn)
+FetchContent_MakeAvailable(dawn)
 target_link_libraries(betann PUBLIC dawncpp_headers
                              PRIVATE absl::strings
                                      dawn::dawn_common
