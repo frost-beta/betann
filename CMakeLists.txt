@@ -55,6 +55,7 @@ FetchContent_Declare(
   GIT_TAG "chromium/6972"
   GIT_SHALLOW ON
   GIT_SUBMODULES ""  # no submodules
+  UPDATE_DISCONNECTED ON  # no update when re-generating
   EXCLUDE_FROM_ALL)
 set(DAWN_FETCH_DEPENDENCIES ON)
 set(DAWN_USE_GLFW OFF)
