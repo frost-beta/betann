@@ -24,15 +24,15 @@ enum class BinaryOpType {
   VectorVector,
 };
 
-void BinaryOp(Device& device,
-              BinaryOpType type,
-              const char* name,
-              size_t outputSize,
-              const char* outputDataType,
-              const wgpu::Buffer& output,
-              const char* inputDataType,
-              const wgpu::Buffer& a,
-              const wgpu::Buffer& b);
+void BinaryOpContiguous(Device& device,
+                        BinaryOpType type,
+                        const char* name,
+                        size_t outputSize,
+                        const char* outputDataType,
+                        const wgpu::Buffer& output,
+                        const char* inputDataType,
+                        const wgpu::Buffer& a,
+                        const wgpu::Buffer& b);
 
 void BinaryOpGeneral(Device& device,
                      const char* name,

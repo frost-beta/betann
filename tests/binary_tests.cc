@@ -35,24 +35,24 @@ class BinaryTest : public testing::Test {
   }
 
   template<typename T, typename I>
-  std::vector<T> RunBinaryOp(betann::BinaryOpType type,
-                             const char* name,
-                             const std::vector<I>& a,
-                             const std::vector<I>& b) {
+  std::vector<T> RunBinaryOpContiguous(betann::BinaryOpType type,
+                                       const char* name,
+                                       const std::vector<I>& a,
+                                       const std::vector<I>& b) {
     size_t outputSize = std::max(a.size(), b.size());
     wgpu::Buffer output = device_.CreateBuffer(
         outputSize * sizeof(T),
         wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
     output.SetLabel("output");
-    betann::BinaryOp(device_,
-                     type,
-                     name,
-                     outputSize,
-                     betann::GetWgslDataType<T>(),
-                     output,
-                     betann::GetWgslDataType<I>(),
-                     device_.CreateBufferFromVector(a),
-                     device_.CreateBufferFromVector(b));
+    betann::BinaryOpContiguous(device_,
+                               type,
+                               name,
+                               outputSize,
+                               betann::GetWgslDataType<T>(),
+                               output,
+                               betann::GetWgslDataType<I>(),
+                               device_.CreateBufferFromVector(a),
+                               device_.CreateBufferFromVector(b));
     device_.Flush();
     return ReadFromBuffer<T>(output, outputSize);
   }
@@ -93,25 +93,25 @@ class BinaryTest : public testing::Test {
 };
 
 TEST_F(BinaryTest, SmallArrays) {
-  std::vector<float> ss = RunBinaryOp<float, uint32_t>(
+  std::vector<float> ss = RunBinaryOpContiguous<float, uint32_t>(
       betann::BinaryOpType::ScalarScalar,
       "add",
       {8900},
       {64});
   EXPECT_EQ(ss, std::vector<float>({8964}));
-  std::vector<int32_t> sv = RunBinaryOp<int32_t, int32_t>(
+  std::vector<int32_t> sv = RunBinaryOpContiguous<int32_t, int32_t>(
       betann::BinaryOpType::ScalarVector,
       "power",
       {2},
       {1, 2, 3, 4, 5, 6});
   EXPECT_EQ(sv, std::vector<int32_t>({2, 4, 8, 16, 32, 64}));
-  std::vector<int32_t> vs = RunBinaryOp<int32_t, float>(
+  std::vector<int32_t> vs = RunBinaryOpContiguous<int32_t, float>(
       betann::BinaryOpType::VectorScalar,
       "multiply",
       {64, 64, 64},
       {140.0625});
   EXPECT_EQ(vs, std::vector<int32_t>({8964, 8964, 8964}));
-  std::vector<float> vv = RunBinaryOp<float, float>(
+  std::vector<float> vv = RunBinaryOpContiguous<float, float>(
       betann::BinaryOpType::VectorVector,
       "subtract",
       {100, 100, 100},
@@ -126,7 +126,7 @@ TEST_F(BinaryTest, LargeArrays) {
   std::fill(a.begin(), a.end(), 8900);
   std::vector<uint32_t> b(outputSize);
   std::fill(b.begin(), b.end(), 64);
-  std::vector<float> vv = RunBinaryOp<float, uint32_t>(
+  std::vector<float> vv = RunBinaryOpContiguous<float, uint32_t>(
       betann::BinaryOpType::VectorVector,
       "add",
       a,

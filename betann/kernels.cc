@@ -50,15 +50,15 @@ std::string GetShaderSourceBinaryGeneral(const char* op,
 
 }  // namespace
 
-void BinaryOp(Device& device,
-              BinaryOpType type,
-              const char* name,
-              size_t outputSize,
-              const char* outputDataType,
-              const wgpu::Buffer& output,
-              const char* inputDataType,
-              const wgpu::Buffer& a,
-              const wgpu::Buffer& b) {
+void BinaryOpContiguous(Device& device,
+                        BinaryOpType type,
+                        const char* name,
+                        size_t outputSize,
+                        const char* outputDataType,
+                        const wgpu::Buffer& output,
+                        const char* inputDataType,
+                        const wgpu::Buffer& a,
+                        const wgpu::Buffer& b) {
   if (outputSize > UINT32_MAX) {
     throw std::runtime_error(
         fmt::format("Number of elements ({}) exceeds maximum index.",
