@@ -65,10 +65,10 @@ set(DAWN_BUILD_MONOLITHIC_LIBRARY OFF)
 set(TINT_BUILD_CMD_TOOLS OFF)
 set(TINT_BUILD_TESTS OFF)
 FetchContent_MakeAvailable(dawn)
-target_link_libraries(betann PUBLIC dawncpp_headers
-                             PRIVATE absl::strings
-                                     dawn::dawn_common
-                                     dawn::dawn_native)
+target_link_libraries(betann PUBLIC $<BUILD_INTERFACE:dawncpp_headers>
+                             PRIVATE $<LINK_ONLY:absl::strings>
+                                     $<LINK_ONLY:dawn::dawn_common>
+                                     $<LINK_ONLY:dawn::dawn_native>)
 
 # Build the procs that call dawn_native directly.
 find_package(Python3 REQUIRED)
@@ -89,3 +89,11 @@ if (BETANN_BUILD_TESTS)
   target_link_libraries(betann_tests PRIVATE betann
                                              GTest::gtest_main)
 endif()
+
+# Make the library installable.
+install(TARGETS betann
+        EXPORT BetaNNTargets
+        FILE_SET HEADERS)
+install(EXPORT BetaNNTargets
+        FILE BetaNN.cmake
+        DESTINATION share/cmake/betann)
