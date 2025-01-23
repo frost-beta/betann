@@ -30,7 +30,7 @@ Device::Device() {
   options.powerPreference = wgpu::PowerPreference::HighPerformance;
   wgpu::Future future = instance_.RequestAdapter(
       &options,
-      wgpu::CallbackMode::AllowSpontaneous,
+      wgpu::CallbackMode::WaitAnyOnly,
       [this](wgpu::RequestAdapterStatus status,
              wgpu::Adapter result,
              const char* message) {
@@ -70,7 +70,7 @@ Device::Device() {
       });
   future = adapter_.RequestDevice(
       &deviceDescriptor,
-      wgpu::CallbackMode::AllowSpontaneous,
+      wgpu::CallbackMode::WaitAnyOnly,
       [this](wgpu::RequestDeviceStatus status,
              wgpu::Device result,
              const char* message) {
@@ -88,18 +88,21 @@ Device::Device() {
   if (device_.GetLimits(&limits) != wgpu::Status::Success)
     throw std::runtime_error("GetLimits failed.");
   limits_ = limits.limits;
-
-  // Create a thread to poll futures.
-  thread_ = std::thread(&Device::PollingThread, this);
 }
 
-Device::~Device() {
-  {
-    std::lock_guard lock(mutex_);
-    shutdown_ = true;
-  }
-  hold_.notify_one();
-  thread_.join();
+Device::~Device() = default;
+
+wgpu::Future Device::OnSubmittedWorkDone(std::function<void()> cb) {
+  return AddFuture(queue_.OnSubmittedWorkDone(
+      wgpu::CallbackMode::WaitAnyOnly,
+      [cb = std::move(cb)](wgpu::QueueWorkDoneStatus status) {
+        if (status != wgpu::QueueWorkDoneStatus::Success) {
+          throw std::runtime_error(
+              fmt::format("OnSubmittedWorkDone failed: {}",
+                          static_cast<uint32_t>(status)));
+        }
+        cb();
+      }));
 }
 
 void Device::Flush() {
@@ -112,17 +115,23 @@ void Device::Flush() {
   }
 }
 
-void Device::OnSubmittedWorkDone(std::function<void()> cb) {
-  AddFuture(queue_.OnSubmittedWorkDone(
-      wgpu::CallbackMode::AllowSpontaneous,
-      [cb = std::move(cb)](wgpu::QueueWorkDoneStatus status) {
-        if (status != wgpu::QueueWorkDoneStatus::Success) {
-          throw std::runtime_error(
-              fmt::format("OnSubmittedWorkDone failed: {}",
-                          static_cast<uint32_t>(status)));
-        }
-        cb();
-      }));
+void Device::WaitFor(const wgpu::Future& future) {
+  wgpu::FutureWaitInfo info{future.id};
+  instance_.WaitAny(1, &info, UINT64_MAX);
+}
+
+void Device::WaitAll() {
+  auto futures = std::move(futures_);
+  while (!futures.empty()) {
+    std::vector<wgpu::FutureWaitInfo> infos;
+    for (uint64_t futureID : futures)
+      infos.push_back({futureID});
+    instance_.WaitAny(infos.size(), infos.data(), UINT64_MAX);
+    for (const wgpu::FutureWaitInfo& info : infos) {
+      if (info.completed)
+        futures.erase(info.future.id);
+    }
+  }
 }
 
 wgpu::Buffer Device::CreateBuffer(size_t size, wgpu::BufferUsage usage) {
@@ -163,13 +172,14 @@ void Device::WriteBuffer(void* data, size_t size, wgpu::Buffer* buffer) {
   queue_.WriteBuffer(*buffer, 0, data, size);
 }
 
-void Device::ReadStagingBuffer(const wgpu::Buffer& buffer,
-                               std::function<void(const void* data)> cb) {
-  AddFuture(buffer.MapAsync(
+wgpu::Future Device::ReadStagingBuffer(
+    const wgpu::Buffer& buffer,
+    std::function<void(const void* data)> cb) {
+  return AddFuture(buffer.MapAsync(
       wgpu::MapMode::Read,
       0,
       wgpu::kWholeMapSize,
-      wgpu::CallbackMode::AllowSpontaneous,
+      wgpu::CallbackMode::WaitAnyOnly,
       [buffer, cb=std::move(cb)](wgpu::MapAsyncStatus status,
                                  const char* message) {
         if (status != wgpu::MapAsyncStatus::Success)
@@ -252,47 +262,9 @@ void Device::EndEncoding() {
   encoder_ = nullptr;
 }
 
-void Device::AddFuture(const wgpu::Future& future) {
-  {
-    std::lock_guard lock(mutex_);
-    futures_.insert(future.id);
-  }
-  hold_.notify_one();
-}
-
-// static
-void Device::PollingThread(Device* self) {
-  while (true) {
-    // Collect futures to wait.
-    std::vector<wgpu::FutureWaitInfo> infos;
-    {
-      std::lock_guard lock(self->mutex_);
-      for (uint64_t futureID : self->futures_)
-        infos.push_back({futureID});
-    }
-    if (infos.empty()) {
-      // If there is no futures, wait until we get one.
-      std::unique_lock lock(self->mutex_);
-      self->hold_.wait(lock, [&]() {
-        return self->shutdown_ || !self->futures_.empty();
-      });
-    } else {
-      // Wait for a future to resolve, and then process events.
-      wgpu::WaitStatus status = self->instance_.WaitAny(infos.size(),
-                                                        infos.data(),
-                                                        UINT64_MAX);
-      assert(status == wgpu::WaitStatus::Success);
-      self->instance_.ProcessEvents();
-      // Erase completed ones.
-      std::lock_guard lock(self->mutex_);
-      for (const wgpu::FutureWaitInfo& info : infos) {
-        if (info.completed)
-          self->futures_.erase(info.future.id);
-      }
-    }
-    if (self->shutdown_)
-      break;
-  }
+wgpu::Future Device::AddFuture(const wgpu::Future& future) {
+  futures_.insert(future.id);
+  return future;
 }
 
 }  // namespace betann

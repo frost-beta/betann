@@ -9,28 +9,16 @@
 
 class BinaryTest : public testing::Test {
  protected:
-  void Wakeup() {
-    std::lock_guard lock(mutex_);
-    cv_.notify_one();
-  };
-
-  void Wait() {
-    std::unique_lock lock(mutex_);
-    cv_.wait(lock);
-  };
-
   template<typename T>
   std::vector<T> ReadFromBuffer(const wgpu::Buffer& buf, size_t size) {
     wgpu::Buffer staging = device_.CopyToStagingBuffer(buf);
     device_.Flush();
     std::vector<T> out(size);
-    device_.ReadStagingBuffer(
+    device_.WaitFor(device_.ReadStagingBuffer(
         staging,
         [&](const void* data) {
           std::memcpy(out.data(), data, size * sizeof(T));
-          Wakeup();
-        });
-    Wait();
+        }));
     return out;
   }
 
@@ -88,8 +76,6 @@ class BinaryTest : public testing::Test {
   }
 
   betann::Device device_;
-  std::mutex mutex_;
-  std::condition_variable cv_;
 };
 
 TEST_F(BinaryTest, SmallArrays) {
