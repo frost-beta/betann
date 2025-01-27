@@ -51,22 +51,22 @@ std::string GetShaderSourceBinaryGeneral(const char* op,
 }  // namespace
 
 void BinaryOpContiguous(Device& device,
-                        BinaryOpType type,
                         const char* name,
-                        size_t outputSize,
+                        BinaryOpType type,
                         const char* outputDataType,
                         const wgpu::Buffer& output,
+                        size_t outputNumElements,
                         const char* inputDataType,
                         const wgpu::Buffer& a,
                         const wgpu::Buffer& b) {
-  if (outputSize > UINT32_MAX) {
+  if (outputNumElements > UINT32_MAX) {
     throw std::runtime_error(
         fmt::format("Number of elements ({}) exceeds maximum index.",
-                    outputSize));
+                    outputNumElements));
   }
   uint32_t maxThreadsPerGridDim =
       device.GetLimits().maxComputeWorkgroupsPerDimension;
-  bool use2DGrid = outputSize > maxThreadsPerGridDim;
+  bool use2DGrid = outputNumElements > maxThreadsPerGridDim;
   std::string kernelName = fmt::format("binary_{}_{}",
                                        GetBinaryOpTypeStr(type, use2DGrid),
                                        name);
@@ -87,9 +87,9 @@ void BinaryOpContiguous(Device& device,
   if (use2DGrid) {
     gridDims.x =
         std::floor(maxThreadsPerGridDim / static_cast<float>(workgroupSize));
-    gridDims.y = std::ceil(outputSize / static_cast<float>(gridDims.x));
+    gridDims.y = std::ceil(outputNumElements / static_cast<float>(gridDims.x));
   } else {
-    gridDims.x = std::ceil(outputSize / static_cast<float>(workgroupSize));
+    gridDims.x = std::ceil(outputNumElements / static_cast<float>(workgroupSize));
   }
   device.RunKernel(kernel,
                    device.CreateBindGroup(kernel, {a, b, output}),
@@ -108,15 +108,15 @@ void BinaryOpGeneral(Device& device,
                      const wgpu::Buffer& b,
                      size_t bNumElements,
                      const std::vector<uint32_t>& bStrides) {
-  size_t outputSize = std::accumulate(shape.begin(), shape.end(),
-                                      1,
-                                      std::multiplies<uint32_t>());
+  size_t outputNumElements = std::accumulate(shape.begin(), shape.end(),
+                                             1,
+                                             std::multiplies<uint32_t>());
   if (aNumElements > UINT32_MAX ||
       bNumElements > UINT32_MAX ||
-      outputSize > UINT32_MAX) {
+      outputNumElements > UINT32_MAX) {
     throw std::runtime_error(
         fmt::format("Number of elements ({}, {}, {}) exceeds maximum index.",
-                    outputSize, aNumElements, bNumElements));
+                    outputNumElements, aNumElements, bNumElements));
   }
   size_t ndim = shape.size();
   std::string kernelName;
@@ -151,7 +151,7 @@ void BinaryOpGeneral(Device& device,
   bindGroup.SetLabel(kernelName.c_str());
   size_t dim0 = ndim > 0 ? shape[ndim - 1] : 1;
   size_t dim1 = ndim > 1 ? shape[ndim - 2] : 1;
-  size_t rest = outputSize / (dim0 * dim1);
+  size_t rest = outputNumElements / (dim0 * dim1);
   if (ndim > 3) {
     const uint32_t workPerThread = 2;
     dim0 = (dim0 + workPerThread - 1) / workPerThread;

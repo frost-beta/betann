@@ -27,22 +27,22 @@ class BinaryTest : public testing::Test {
                                        const char* name,
                                        const std::vector<I>& a,
                                        const std::vector<I>& b) {
-    size_t outputSize = std::max(a.size(), b.size());
+    size_t outputNumElements = std::max(a.size(), b.size());
     wgpu::Buffer output = device_.CreateBuffer(
-        outputSize * sizeof(T),
+        outputNumElements * sizeof(T),
         wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
     output.SetLabel("output");
     betann::BinaryOpContiguous(device_,
-                               type,
                                name,
-                               outputSize,
+                               type,
                                betann::GetWgslDataType<T>(),
                                output,
+                               outputNumElements,
                                betann::GetWgslDataType<I>(),
                                device_.CreateBufferFromVector(a),
                                device_.CreateBufferFromVector(b));
     device_.Flush();
-    return ReadFromBuffer<T>(output, outputSize);
+    return ReadFromBuffer<T>(output, outputNumElements);
   }
 
   template<typename T, typename I>
@@ -52,11 +52,11 @@ class BinaryTest : public testing::Test {
                                     const std::vector<uint32_t>& aStrides,
                                     const std::vector<I>& b,
                                     const std::vector<uint32_t>& bStrides) {
-    size_t outputSize = std::accumulate(shape.begin(), shape.end(),
-                                        1,
-                                        std::multiplies<uint32_t>());
+    size_t outputNumElements = std::accumulate(shape.begin(), shape.end(),
+                                               1,
+                                               std::multiplies<uint32_t>());
     wgpu::Buffer output = device_.CreateBuffer(
-        outputSize * sizeof(T),
+        outputNumElements * sizeof(T),
         wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
     output.SetLabel("output");
     betann::BinaryOpGeneral(device_,
@@ -72,7 +72,7 @@ class BinaryTest : public testing::Test {
                             b.size(),
                             bStrides);
     device_.Flush();
-    return ReadFromBuffer<T>(output, outputSize);
+    return ReadFromBuffer<T>(output, outputNumElements);
   }
 
   betann::Device device_;
@@ -106,11 +106,11 @@ TEST_F(BinaryTest, SmallArrays) {
 }
 
 TEST_F(BinaryTest, LargeArrays) {
-  uint32_t outputSize =
+  uint32_t outputNumElements =
       device_.GetLimits().maxComputeWorkgroupsPerDimension + 100;
-  std::vector<uint32_t> a(outputSize);
+  std::vector<uint32_t> a(outputNumElements);
   std::fill(a.begin(), a.end(), 8900);
-  std::vector<uint32_t> b(outputSize);
+  std::vector<uint32_t> b(outputNumElements);
   std::fill(b.begin(), b.end(), 64);
   std::vector<float> vv = RunBinaryOpContiguous<float, uint32_t>(
       betann::BinaryOpType::VectorVector,
@@ -181,12 +181,12 @@ TEST_F(BinaryTest, GeneralNonContiguous) {
 TEST_F(BinaryTest, GeneralLargeArrays) {
   std::vector<uint32_t> shape = {33, 33, 33};
   std::vector<uint32_t> strides = {33 * 33, 33, 1};
-  size_t outputSize = std::accumulate(shape.begin(), shape.end(),
-                                      1,
-                                      std::multiplies<uint32_t>());
-  std::vector<float> a(outputSize);
+  size_t outputNumElements = std::accumulate(shape.begin(), shape.end(),
+                                             1,
+                                             std::multiplies<uint32_t>());
+  std::vector<float> a(outputNumElements);
   std::fill(a.begin(), a.end(), 8);
-  std::vector<float> b(outputSize);
+  std::vector<float> b(outputNumElements);
   std::fill(b.begin(), b.end(), 8);
   std::vector<uint32_t> c = RunBinaryOpGeneral<uint32_t, float>(
       "multiply", shape, a, strides, b, strides);
@@ -221,16 +221,16 @@ TEST_F(BinaryTest, General4D) {
 TEST_F(BinaryTest, General4DLargeArrays) {
   std::vector<uint32_t> shape = {33, 33, 33, 33};
   std::vector<uint32_t> strides = {33 * 33 * 33, 33 * 33, 33, 1};
-  size_t outputSize = std::accumulate(shape.begin(), shape.end(),
-                                      1,
-                                      std::multiplies<uint32_t>());
-  std::vector<float> a(outputSize);
+  size_t outputNumElements = std::accumulate(shape.begin(), shape.end(),
+                                             1,
+                                             std::multiplies<uint32_t>());
+  std::vector<float> a(outputNumElements);
   std::iota(a.begin(), a.end(), 1);
-  std::vector<float> b(outputSize);
+  std::vector<float> b(outputNumElements);
   std::iota(b.begin(), b.end(), 1);
   std::vector<float> c = RunBinaryOpGeneral<float, float>(
       "multiply", shape, a, strides, b, strides);
-  std::vector<float> expected(outputSize);
+  std::vector<float> expected(outputNumElements);
   std::transform(a.begin(), a.end(), expected.begin(),
                  [](float i) { return i * i; });
   EXPECT_EQ(c, expected);

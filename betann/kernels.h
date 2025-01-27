@@ -25,11 +25,11 @@ enum class BinaryOpType {
 };
 
 void BinaryOpContiguous(Device& device,
-                        BinaryOpType type,
                         const char* name,
-                        size_t outputSize,
+                        BinaryOpType type,
                         const char* outputDataType,
                         const wgpu::Buffer& output,
+                        size_t outputNumElements,
                         const char* inputDataType,
                         const wgpu::Buffer& a,
                         const wgpu::Buffer& b);
