@@ -22,7 +22,7 @@ target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURC
                                   PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/gen")
 
 # Embed WGSL sources in binary.
-set(BETANN_WGSL_SOURCES betann/wgsl/binary.wgsl
+set(BETANN_WGSL_SOURCES betann/wgsl/binary_contiguous.wgsl
                         betann/wgsl/binary_general.wgsl
                         betann/wgsl/binary_ops.wgsl)
 string(JOIN ":" BETANN_WGSL_SOURCES_ARG ${BETANN_WGSL_SOURCES})

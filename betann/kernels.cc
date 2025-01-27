@@ -26,10 +26,10 @@ inline const char* GetBinaryOpTypeStr(BinaryOpType type, bool largeArray) {
   }
 }
 
-std::string GetShaderSourceBinary(const char* op,
-                                  const char* inputDataType,
-                                  const char* outputDataType) {
-  std::string preprocessed = absl::Substitute(wgsl_source_binary,
+std::string GetShaderSourceBinaryContiguous(const char* op,
+                                            const char* inputDataType,
+                                            const char* outputDataType) {
+  std::string preprocessed = absl::Substitute(wgsl_source_binary_contiguous,
                                               op,
                                               inputDataType,
                                               outputDataType);
@@ -38,8 +38,8 @@ std::string GetShaderSourceBinary(const char* op,
 }
 
 std::string GetShaderSourceBinaryGeneral(const char* op,
-                                           const char* inputDataType,
-                                           const char* outputDataType) {
+                                         const char* inputDataType,
+                                         const char* outputDataType) {
   std::string preprocessed = absl::Substitute(wgsl_source_binary_general,
                                               op,
                                               inputDataType,
@@ -77,7 +77,9 @@ void BinaryOpContiguous(Device& device,
   const wgpu::ShaderModule& shader = device.CreateShaderModule(
       shaderName.c_str(),
       [&]() {
-        return GetShaderSourceBinary(name, inputDataType, outputDataType);
+        return GetShaderSourceBinaryContiguous(name,
+                                               inputDataType,
+                                               outputDataType);
       });
   const wgpu::ComputePipeline& kernel = device.CreateKernel(
       shader,
