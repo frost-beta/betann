@@ -24,7 +24,8 @@ target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURC
 # Embed WGSL sources in binary.
 set(BETANN_WGSL_SOURCES betann/wgsl/binary_contiguous.wgsl
                         betann/wgsl/binary_general.wgsl
-                        betann/wgsl/binary_ops.wgsl)
+                        betann/wgsl/binary_ops.wgsl
+                        betann/wgsl/copy_contiguous.wgsl)
 string(JOIN ":" BETANN_WGSL_SOURCES_ARG ${BETANN_WGSL_SOURCES})
 add_custom_command(
   OUTPUT gen/wgsl_sources.h
@@ -86,7 +87,8 @@ if (BETANN_BUILD_TESTS)
     GIT_TAG v1.15.2
     EXCLUDE_FROM_ALL)
   FetchContent_MakeAvailable(googletest)
-  add_executable(betann_tests tests/binary_tests.cc)
+  add_executable(betann_tests tests/binary_tests.cc
+                              tests/copy_tests.cc)
   target_link_libraries(betann_tests PRIVATE betann
                                              GTest::gtest_main)
 endif()

@@ -1,27 +1,7 @@
-#include <algorithm>
-#include <condition_variable>
-#include <cstring>
-#include <mutex>
-#include <numeric>
+#include "betann_tests.h"
 
-#include <betann/betann.h>
-#include <gtest/gtest.h>
-
-class BinaryTest : public testing::Test {
- protected:
-  template<typename T>
-  std::vector<T> ReadFromBuffer(const wgpu::Buffer& buf, size_t size) {
-    wgpu::Buffer staging = device_.CopyToStagingBuffer(buf);
-    device_.Flush();
-    std::vector<T> out(size);
-    device_.WaitFor(device_.ReadStagingBuffer(
-        staging,
-        [&](const void* data) {
-          std::memcpy(out.data(), data, size * sizeof(T));
-        }));
-    return out;
-  }
-
+class BinaryTests : public BetaNNTests {
+ public:
   template<typename T, typename I>
   std::vector<T> RunBinaryOpContiguous(betann::BinaryOpType type,
                                        const char* name,
@@ -74,11 +54,9 @@ class BinaryTest : public testing::Test {
     device_.Flush();
     return ReadFromBuffer<T>(output, outputNumElements);
   }
-
-  betann::Device device_;
 };
 
-TEST_F(BinaryTest, SmallArrays) {
+TEST_F(BinaryTests, SmallArrays) {
   std::vector<float> ss = RunBinaryOpContiguous<float, uint32_t>(
       betann::BinaryOpType::ScalarScalar,
       "add",
@@ -105,7 +83,7 @@ TEST_F(BinaryTest, SmallArrays) {
   EXPECT_EQ(vv, std::vector<float>({89.64, 89.64, 89.64}));
 }
 
-TEST_F(BinaryTest, LargeArrays) {
+TEST_F(BinaryTests, LargeArrays) {
   uint32_t outputNumElements =
       device_.GetLimits().maxComputeWorkgroupsPerDimension + 100;
   std::vector<uint32_t> a(outputNumElements);
@@ -121,7 +99,7 @@ TEST_F(BinaryTest, LargeArrays) {
                           [](float i) { return i == 8964; }));
 }
 
-TEST_F(BinaryTest, GeneralContiguous) {
+TEST_F(BinaryTests, GeneralContiguous) {
   std::vector<float> con1d = RunBinaryOpGeneral<float, float>(
       "subtract",
       {3},
@@ -151,7 +129,7 @@ TEST_F(BinaryTest, GeneralContiguous) {
       std::vector<uint32_t>({m - 3, m - 2, m - 1, m, 0, 1, 2, 3, 4}));
 }
 
-TEST_F(BinaryTest, GeneralNonContiguous) {
+TEST_F(BinaryTests, GeneralNonContiguous) {
   std::vector<float> noc1d = RunBinaryOpGeneral<float, float>(
       "multiply",
       {2},
@@ -178,7 +156,7 @@ TEST_F(BinaryTest, GeneralNonContiguous) {
   EXPECT_EQ(noc3d, std::vector<float>({1, 3, 2, 4, 1, 3, 2, 4}));
 }
 
-TEST_F(BinaryTest, GeneralLargeArrays) {
+TEST_F(BinaryTests, GeneralLargeArrays) {
   std::vector<uint32_t> shape = {33, 33, 33};
   std::vector<uint32_t> strides = {33 * 33, 33, 1};
   size_t outputNumElements = std::accumulate(shape.begin(), shape.end(),
@@ -194,7 +172,7 @@ TEST_F(BinaryTest, GeneralLargeArrays) {
                           [](uint32_t i) { return i == 64; }));
 }
 
-TEST_F(BinaryTest, General4D) {
+TEST_F(BinaryTests, General4D) {
   std::vector<uint32_t> row = RunBinaryOpGeneral<uint32_t, uint32_t>(
       "add",
       {1, 1, 1, 4},
@@ -218,7 +196,7 @@ TEST_F(BinaryTest, General4D) {
   EXPECT_EQ(cube, expected);
 }
 
-TEST_F(BinaryTest, General4DLargeArrays) {
+TEST_F(BinaryTests, General4DLargeArrays) {
   std::vector<uint32_t> shape = {33, 33, 33, 33};
   std::vector<uint32_t> strides = {33 * 33 * 33, 33 * 33, 33, 1};
   size_t outputNumElements = std::accumulate(shape.begin(), shape.end(),

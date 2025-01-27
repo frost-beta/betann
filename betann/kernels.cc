@@ -26,6 +26,15 @@ inline const char* GetBinaryOpTypeStr(BinaryOpType type, bool largeArray) {
   }
 }
 
+inline const char* GetCopyTypeStr(CopyType type, bool largeArray) {
+  switch (type) {
+    case CopyType::Scalar:
+      return largeArray ? "s2" : "s";
+    case CopyType::Vector:
+      return largeArray ? "v2" : "v";
+  }
+}
+
 std::string GetShaderSourceBinaryContiguous(const char* op,
                                             const char* inputDataType,
                                             const char* outputDataType) {
@@ -46,6 +55,13 @@ std::string GetShaderSourceBinaryGeneral(const char* op,
                                               outputDataType);
   preprocessed += wgsl_source_binary_ops;
   return preprocessed;
+}
+
+std::string GetShaderSourceCopyContiguous(const char* srcDataType,
+                                          const char* dstDataType) {
+  return absl::Substitute(wgsl_source_copy_contiguous,
+                          srcDataType,
+                          dstDataType);
 }
 
 }  // namespace
@@ -164,6 +180,49 @@ void BinaryOpGeneral(Device& device,
   gridDims.y = std::ceil(dim1 / static_cast<float>(workgroupSize));
   gridDims.z = std::ceil(rest / static_cast<float>(workgroupSize));
   device.RunKernel(kernel, bindGroup, gridDims);
+}
+
+void CopyContiguous(Device& device,
+                    CopyType type,
+                    const char* dstDataType,
+                    const wgpu::Buffer& dst,
+                    size_t dstNumElements,
+                    const char* srcDataType,
+                    const wgpu::Buffer& src) {
+  if (dstNumElements > UINT32_MAX) {
+    throw std::runtime_error(
+        fmt::format("Number of elements ({}) exceeds maximum index.",
+                    dstNumElements));
+  }
+  uint32_t maxThreadsPerGridDim =
+      device.GetLimits().maxComputeWorkgroupsPerDimension;
+  bool use2DGrid = dstNumElements > maxThreadsPerGridDim;
+  std::string kernelName = fmt::format("copy_{}",
+                                       GetCopyTypeStr(type, use2DGrid));
+  std::string shaderName = fmt::format("{}_{}_{}",
+                                       kernelName,
+                                       srcDataType,
+                                       dstDataType);
+  const wgpu::ShaderModule& shader = device.CreateShaderModule(
+      shaderName.c_str(),
+      [&]() {
+        return GetShaderSourceCopyContiguous(srcDataType, dstDataType);
+      });
+  const wgpu::ComputePipeline& kernel = device.CreateKernel(
+      shader,
+      kernelName.c_str());
+  const uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
+  GridDims gridDims;
+  if (use2DGrid) {
+    gridDims.x =
+        std::floor(maxThreadsPerGridDim / static_cast<float>(workgroupSize));
+    gridDims.y = std::ceil(dstNumElements / static_cast<float>(gridDims.x));
+  } else {
+    gridDims.x = std::ceil(dstNumElements / static_cast<float>(workgroupSize));
+  }
+  device.RunKernel(kernel,
+                   device.CreateBindGroup(kernel, {src, dst}),
+                   gridDims);
 }
 
 }  // namespace betann

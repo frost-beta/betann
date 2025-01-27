@@ -18,12 +18,17 @@ template<> inline const char* GetWgslDataType<uint32_t>() { return "u32"; }
 template<> inline const char* GetWgslDataType<float>() { return "f32"; }
 
 enum class BinaryOpType {
+  // Both operands are scalars.
   ScalarScalar,
+  // Left operand is a scalar and right operand is contiguous.
   ScalarVector,
+  // Left operand is contiguous and right operand is a scalar.
   VectorScalar,
+  // Both operands are contiguous.
   VectorVector,
 };
 
+// Run binary operations on contiguous inputs.
 void BinaryOpContiguous(Device& device,
                         const char* name,
                         BinaryOpType type,
@@ -34,6 +39,7 @@ void BinaryOpContiguous(Device& device,
                         const wgpu::Buffer& a,
                         const wgpu::Buffer& b);
 
+// Run binary operands on virtual inputs and write to full contiguous output.
 void BinaryOpGeneral(Device& device,
                      const char* name,
                      const std::vector<uint32_t>& shape,
@@ -46,6 +52,23 @@ void BinaryOpGeneral(Device& device,
                      const wgpu::Buffer& b,
                      size_t bNumElements,
                      const std::vector<uint32_t>& bStrides);
+
+enum class CopyType {
+  // Copy a raw scalar input into the full contiguous output.
+  Scalar,
+  // Copy the raw input buffer contiguously into a raw output buffer of the same
+  // size.
+  Vector,
+};
+
+// Copy data from src to dst contiguously.
+void CopyContiguous(Device& device,
+                    CopyType type,
+                    const char* dstDataType,
+                    const wgpu::Buffer& dst,
+                    size_t dstNumElements,
+                    const char* srcDataType,
+                    const wgpu::Buffer& src);
 
 }  // namespace betann
 
