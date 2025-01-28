@@ -39,9 +39,9 @@ class BinaryTests : public BetaNNTests {
     output.SetLabel("output");
     betann::BinaryOpGeneral(device_,
                             name,
-                            shape,
                             betann::GetWgslDataType<T>(),
                             output,
+                            shape,
                             betann::GetWgslDataType<I>(),
                             device_.CreateBufferFromVector(a),
                             a.size(),
@@ -83,7 +83,7 @@ TEST_F(BinaryTests, SmallArrays) {
 
 TEST_F(BinaryTests, LargeArrays) {
   uint32_t outputNumElements =
-      device_.GetLimits().maxComputeWorkgroupsPerDimension + 100;
+      device_.GetLimits().maxComputeWorkgroupsPerDimension * 256 + 100;
   std::vector<uint32_t> a(outputNumElements);
   std::fill(a.begin(), a.end(), 8900);
   std::vector<uint32_t> b(outputNumElements);

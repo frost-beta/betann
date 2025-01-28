@@ -3,8 +3,8 @@ alias input_dtype = $1;
 
 override num_threads: u32 = 8;
 
-@group(0) @binding(0) var<storage, read> shape: array<u32>;
-@group(0) @binding(1) var<storage, read_write> c: array<output_dtype>;
+@group(0) @binding(0) var<storage, read_write> c: array<output_dtype>;
+@group(0) @binding(1) var<storage, read> shape: array<u32>;
 @group(0) @binding(2) var<storage, read> a: array<input_dtype>;
 @group(0) @binding(3) var<storage, read> a_strides: array<u32>;
 @group(0) @binding(4) var<storage, read> b: array<input_dtype>;
@@ -43,7 +43,7 @@ fn binary_g3_$2(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 
 @compute @workgroup_size(num_threads, num_threads, num_threads)
-fn binary_gn2_$2(@builtin(global_invocation_id) gid: vec3<u32>) {
+fn binary_g_n2_$2(@builtin(global_invocation_id) gid: vec3<u32>) {
   // Check boundries.
   const work_per_thread: u32 = 2;
   let ndim = i32(arrayLength(&shape));

@@ -43,6 +43,37 @@ inline std::string Append(std::string prefix, Args&&... args) {
   return prefix;
 }
 
+GridDims GetGridDimsContiguous(uint32_t numElements,
+                               uint32_t threadsPerDim,
+                               uint32_t workgroupSize) {
+  GridDims gridDims;
+  if (numElements > threadsPerDim) {
+    gridDims.x = std::floor(threadsPerDim / static_cast<float>(workgroupSize));
+    gridDims.y = std::ceil(numElements / static_cast<float>(gridDims.x));
+  } else {
+    gridDims.x = std::ceil(numElements / static_cast<float>(workgroupSize));
+  }
+  return gridDims;
+}
+
+GridDims GetGridDimsGeneral(const std::vector<uint32_t>& shape,
+                            uint32_t workgroupSize,
+                            uint32_t workPerThread) {
+  size_t numElements = NumElements(shape);
+  size_t ndim = shape.size();
+  size_t dim0 = ndim > 0 ? shape[ndim - 1] : 1;
+  size_t dim1 = ndim > 1 ? shape[ndim - 2] : 1;
+  size_t rest = numElements / (dim0 * dim1);
+  if (ndim > 3) {
+    dim0 = (dim0 + workPerThread - 1) / workPerThread;
+  }
+  GridDims gridDims;
+  gridDims.x = std::ceil(dim0 / static_cast<float>(workgroupSize));
+  gridDims.y = std::ceil(dim1 / static_cast<float>(workgroupSize));
+  gridDims.z = std::ceil(rest / static_cast<float>(workgroupSize));
+  return gridDims;
+}
+
 template<typename F>
 void RunKernel(Device& device,
                const std::string& kernelName,
@@ -77,18 +108,10 @@ void BinaryOpContiguous(Device& device,
         fmt::format("Number of elements ({}) exceeds maximum index.",
                     outputNumElements));
   }
-  uint32_t maxThreadsPerGridDim =
-      device.GetLimits().maxComputeWorkgroupsPerDimension;
-  bool use2DGrid = outputNumElements > maxThreadsPerGridDim;
   const uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
-  GridDims gridDims;
-  if (use2DGrid) {
-    gridDims.x =
-        std::floor(maxThreadsPerGridDim / static_cast<float>(workgroupSize));
-    gridDims.y = std::ceil(outputNumElements / static_cast<float>(gridDims.x));
-  } else {
-    gridDims.x = std::ceil(outputNumElements / static_cast<float>(workgroupSize));
-  }
+  uint32_t maxThreadsPerGridDim =
+      device.GetLimits().maxComputeWorkgroupsPerDimension * workgroupSize;
+  bool use2DGrid = outputNumElements > maxThreadsPerGridDim;
   RunKernel(device,
             fmt::format("binary_{}_{}",
                         GetBinaryOpTypeStr(type, use2DGrid),
@@ -102,14 +125,16 @@ void BinaryOpContiguous(Device& device,
                             wgsl_source_binary_ops);
             },
             {output, a, b},
-            gridDims);
+            GetGridDimsContiguous(outputNumElements,
+                                  maxThreadsPerGridDim,
+                                  workgroupSize));
 }
 
 void BinaryOpGeneral(Device& device,
                      const char* name,
-                     const std::vector<uint32_t>& shape,
                      const char* outputDataType,
                      const wgpu::Buffer& output,
+                     const std::vector<uint32_t>& shape,
                      const char* inputDataType,
                      const wgpu::Buffer& a,
                      size_t aNumElements,
@@ -117,30 +142,17 @@ void BinaryOpGeneral(Device& device,
                      const wgpu::Buffer& b,
                      size_t bNumElements,
                      const std::vector<uint32_t>& bStrides) {
-  size_t outputNumElements = NumElements(shape);
-  if (aNumElements > UINT32_MAX ||
-      bNumElements > UINT32_MAX ||
-      outputNumElements > UINT32_MAX) {
+  if (aNumElements > UINT32_MAX || bNumElements > UINT32_MAX) {
     throw std::runtime_error(
-        fmt::format("Number of elements ({}, {}, {}) exceeds maximum index.",
-                    outputNumElements, aNumElements, bNumElements));
+        fmt::format("Number of elements ({}, {}) exceeds maximum index.",
+                    aNumElements, bNumElements));
   }
-  size_t ndim = shape.size();
-  size_t dim0 = ndim > 0 ? shape[ndim - 1] : 1;
-  size_t dim1 = ndim > 1 ? shape[ndim - 2] : 1;
-  size_t rest = outputNumElements / (dim0 * dim1);
-  if (ndim > 3) {
-    const uint32_t workPerThread = 2;
-    dim0 = (dim0 + workPerThread - 1) / workPerThread;
-  }
+  const uint32_t workPerThread = 2;
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
-  GridDims gridDims;
-  gridDims.x = std::ceil(dim0 / static_cast<float>(workgroupSize));
-  gridDims.y = std::ceil(dim1 / static_cast<float>(workgroupSize));
-  gridDims.z = std::ceil(rest / static_cast<float>(workgroupSize));
   RunKernel(device,
-            ndim > 3 ? fmt::format("binary_gn2_{}", name)
-                     : fmt::format("binary_g{}_{}", ndim, name),
+            shape.size() > 3
+                ? fmt::format("binary_g_n{}_{}", workPerThread, name)
+                : fmt::format("binary_g{}_{}", shape.size(), name),
             fmt::format("{}_{}", outputDataType, inputDataType),
             [&]() {
               return Append(GetShaderSource(wgsl_source_binary_general,
@@ -150,14 +162,14 @@ void BinaryOpGeneral(Device& device,
                             wgsl_source_binary_ops);
             },
             {
-              device.CreateBufferFromVector(shape),
               output,
+              device.CreateBufferFromVector(shape),
               a,
               device.CreateBufferFromVector(aStrides),
               b,
               device.CreateBufferFromVector(bStrides),
             },
-            gridDims);
+            GetGridDimsGeneral(shape, workgroupSize, workPerThread));
 }
 
 void CopyContiguous(Device& device,
@@ -172,18 +184,10 @@ void CopyContiguous(Device& device,
         fmt::format("Number of elements ({}) exceeds maximum index.",
                     dstNumElements));
   }
-  uint32_t maxThreadsPerGridDim =
-      device.GetLimits().maxComputeWorkgroupsPerDimension;
-  bool use2DGrid = dstNumElements > maxThreadsPerGridDim;
   const uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
-  GridDims gridDims;
-  if (use2DGrid) {
-    gridDims.x =
-        std::floor(maxThreadsPerGridDim / static_cast<float>(workgroupSize));
-    gridDims.y = std::ceil(dstNumElements / static_cast<float>(gridDims.x));
-  } else {
-    gridDims.x = std::ceil(dstNumElements / static_cast<float>(workgroupSize));
-  }
+  uint32_t maxThreadsPerGridDim =
+      device.GetLimits().maxComputeWorkgroupsPerDimension * workgroupSize;
+  bool use2DGrid = dstNumElements > maxThreadsPerGridDim;
   RunKernel(device,
             fmt::format("copy_{}", GetCopyTypeStr(type, use2DGrid)),
             fmt::format("{}_{}", dstDataType, srcDataType),
@@ -193,7 +197,37 @@ void CopyContiguous(Device& device,
                                      srcDataType);
             },
             {dst, src},
-            gridDims);
+            GetGridDimsContiguous(dstNumElements,
+                                  maxThreadsPerGridDim,
+                                  workgroupSize));
+}
+
+void CopyGeneral(Device& device,
+                 const char* dstDataType,
+                 const wgpu::Buffer& dst,
+                 const char* srcDataType,
+                 const wgpu::Buffer& src,
+                 const std::vector<uint32_t>& srcShape,
+                 const std::vector<uint32_t>& srcStrides) {
+  const uint32_t workPerThread = 2;
+  const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
+  RunKernel(device,
+            srcShape.size() > 3
+                ? fmt::format("copy_g_n{}", workPerThread)
+                : fmt::format("copy_g{}", srcShape.size()),
+            fmt::format("{}_{}", dstDataType, srcDataType),
+            [&]() {
+              return GetShaderSource(wgsl_source_copy_general,
+                                     dstDataType,
+                                     srcDataType);
+            },
+            {
+              dst,
+              src,
+              device.CreateBufferFromVector(srcShape),
+              device.CreateBufferFromVector(srcStrides),
+            },
+            GetGridDimsGeneral(srcShape, workgroupSize, workPerThread));
 }
 
 }  // namespace betann

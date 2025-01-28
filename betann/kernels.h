@@ -39,12 +39,12 @@ void BinaryOpContiguous(Device& device,
                         const wgpu::Buffer& a,
                         const wgpu::Buffer& b);
 
-// Run binary operands on virtual inputs and write to full contiguous output.
+// Run binary operands on virtual inputs and write to contiguous output.
 void BinaryOpGeneral(Device& device,
                      const char* name,
-                     const std::vector<uint32_t>& shape,
                      const char* outputDataType,
                      const wgpu::Buffer& output,
+                     const std::vector<uint32_t>& shape,
                      const char* inputDataType,
                      const wgpu::Buffer& a,
                      size_t aNumElements,
@@ -54,7 +54,7 @@ void BinaryOpGeneral(Device& device,
                      const std::vector<uint32_t>& bStrides);
 
 enum class CopyType {
-  // Copy a raw scalar input into the full contiguous output.
+  // Copy a raw scalar input into the contiguous output.
   Scalar,
   // Copy the raw input buffer contiguously into a raw output buffer of the same
   // size.
@@ -69,6 +69,15 @@ void CopyContiguous(Device& device,
                     size_t dstNumElements,
                     const char* srcDataType,
                     const wgpu::Buffer& src);
+
+// Copy data from virtual src to contiguous dst.
+void CopyGeneral(Device& device,
+                 const char* dstDataType,
+                 const wgpu::Buffer& dst,
+                 const char* srcDataType,
+                 const wgpu::Buffer& src,
+                 const std::vector<uint32_t>& srcShape,
+                 const std::vector<uint32_t>& srcStrides);
 
 }  // namespace betann
 
