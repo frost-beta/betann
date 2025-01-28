@@ -35,33 +35,33 @@ inline const char* GetCopyTypeStr(CopyType type, bool largeArray) {
   }
 }
 
-std::string GetShaderSourceBinaryContiguous(const char* op,
-                                            const char* inputDataType,
-                                            const char* outputDataType) {
-  std::string preprocessed = absl::Substitute(wgsl_source_binary_contiguous,
-                                              op,
-                                              inputDataType,
-                                              outputDataType);
-  preprocessed += wgsl_source_binary_ops;
-  return preprocessed;
+template<typename... Args>
+inline std::string GetShaderSource(Args&&... args) {
+  return absl::Substitute(std::forward<Args>(args)...);
 }
 
-std::string GetShaderSourceBinaryGeneral(const char* op,
-                                         const char* inputDataType,
-                                         const char* outputDataType) {
-  std::string preprocessed = absl::Substitute(wgsl_source_binary_general,
-                                              op,
-                                              inputDataType,
-                                              outputDataType);
-  preprocessed += wgsl_source_binary_ops;
-  return preprocessed;
+template<typename... Args>
+inline std::string Append(std::string prefix, Args&&... args) {
+  ((prefix += args), ...);
+  return prefix;
 }
 
-std::string GetShaderSourceCopyContiguous(const char* srcDataType,
-                                          const char* dstDataType) {
-  return absl::Substitute(wgsl_source_copy_contiguous,
-                          srcDataType,
-                          dstDataType);
+template<typename F>
+void RunKernel(Device& device,
+               const std::string& kernelName,
+               const std::string& shaderSuffix,
+               F&& getSource,
+               std::initializer_list<wgpu::Buffer> buffers,
+               GridDims gridDims) {
+  const wgpu::ShaderModule& shader = device.CreateShaderModule(
+      fmt::format("{}_{}", kernelName, shaderSuffix).c_str(),
+      std::forward<F>(getSource));
+  const wgpu::ComputePipeline& kernel = device.CreateKernel(
+      shader,
+      kernelName.c_str());
+  device.RunKernel(kernel,
+                   device.CreateBindGroup(kernel, std::move(buffers)),
+                   gridDims);
 }
 
 }  // namespace
@@ -83,23 +83,6 @@ void BinaryOpContiguous(Device& device,
   uint32_t maxThreadsPerGridDim =
       device.GetLimits().maxComputeWorkgroupsPerDimension;
   bool use2DGrid = outputNumElements > maxThreadsPerGridDim;
-  std::string kernelName = fmt::format("binary_{}_{}",
-                                       GetBinaryOpTypeStr(type, use2DGrid),
-                                       name);
-  std::string shaderName = fmt::format("{}_{}_{}",
-                                       kernelName,
-                                       inputDataType,
-                                       outputDataType);
-  const wgpu::ShaderModule& shader = device.CreateShaderModule(
-      shaderName.c_str(),
-      [&]() {
-        return GetShaderSourceBinaryContiguous(name,
-                                               inputDataType,
-                                               outputDataType);
-      });
-  const wgpu::ComputePipeline& kernel = device.CreateKernel(
-      shader,
-      kernelName.c_str());
   const uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
   GridDims gridDims;
   if (use2DGrid) {
@@ -109,9 +92,20 @@ void BinaryOpContiguous(Device& device,
   } else {
     gridDims.x = std::ceil(outputNumElements / static_cast<float>(workgroupSize));
   }
-  device.RunKernel(kernel,
-                   device.CreateBindGroup(kernel, {a, b, output}),
-                   gridDims);
+  RunKernel(device,
+            fmt::format("binary_{}_{}",
+                        GetBinaryOpTypeStr(type, use2DGrid),
+                        name),
+            fmt::format("{}_{}", outputDataType, inputDataType),
+            [&]() {
+              return Append(GetShaderSource(wgsl_source_binary_contiguous,
+                                            outputDataType,
+                                            inputDataType,
+                                            name),
+                            wgsl_source_binary_ops);
+            },
+            {output, a, b},
+            gridDims);
 }
 
 void BinaryOpGeneral(Device& device,
@@ -137,36 +131,6 @@ void BinaryOpGeneral(Device& device,
                     outputNumElements, aNumElements, bNumElements));
   }
   size_t ndim = shape.size();
-  std::string kernelName;
-  if (ndim > 3)
-    kernelName = fmt::format("binary_gn2_{}", name);
-  else
-    kernelName = fmt::format("binary_g{}_{}", ndim, name);
-  std::string shaderName = fmt::format("{}_{}_{}",
-                                       kernelName,
-                                       inputDataType,
-                                       outputDataType);
-  const wgpu::ShaderModule& shader = device.CreateShaderModule(
-      shaderName.c_str(),
-      [&]() {
-        return GetShaderSourceBinaryGeneral(name,
-                                            inputDataType,
-                                            outputDataType);
-      });
-  const wgpu::ComputePipeline& kernel = device.CreateKernel(
-      shader,
-      kernelName.c_str());
-  wgpu::BindGroup bindGroup = device.CreateBindGroup(
-      kernel,
-      {
-         a,
-         device.CreateBufferFromVector(aStrides),
-         b,
-         device.CreateBufferFromVector(bStrides),
-         device.CreateBufferFromVector(shape),
-         output,
-      });
-  bindGroup.SetLabel(kernelName.c_str());
   size_t dim0 = ndim > 0 ? shape[ndim - 1] : 1;
   size_t dim1 = ndim > 1 ? shape[ndim - 2] : 1;
   size_t rest = outputNumElements / (dim0 * dim1);
@@ -179,7 +143,26 @@ void BinaryOpGeneral(Device& device,
   gridDims.x = std::ceil(dim0 / static_cast<float>(workgroupSize));
   gridDims.y = std::ceil(dim1 / static_cast<float>(workgroupSize));
   gridDims.z = std::ceil(rest / static_cast<float>(workgroupSize));
-  device.RunKernel(kernel, bindGroup, gridDims);
+  RunKernel(device,
+            ndim > 3 ? fmt::format("binary_gn2_{}", name)
+                     : fmt::format("binary_g{}_{}", ndim, name),
+            fmt::format("{}_{}", outputDataType, inputDataType),
+            [&]() {
+              return Append(GetShaderSource(wgsl_source_binary_general,
+                                            outputDataType,
+                                            inputDataType,
+                                            name),
+                            wgsl_source_binary_ops);
+            },
+            {
+              device.CreateBufferFromVector(shape),
+              output,
+              a,
+              device.CreateBufferFromVector(aStrides),
+              b,
+              device.CreateBufferFromVector(bStrides),
+            },
+            gridDims);
 }
 
 void CopyContiguous(Device& device,
@@ -197,20 +180,6 @@ void CopyContiguous(Device& device,
   uint32_t maxThreadsPerGridDim =
       device.GetLimits().maxComputeWorkgroupsPerDimension;
   bool use2DGrid = dstNumElements > maxThreadsPerGridDim;
-  std::string kernelName = fmt::format("copy_{}",
-                                       GetCopyTypeStr(type, use2DGrid));
-  std::string shaderName = fmt::format("{}_{}_{}",
-                                       kernelName,
-                                       srcDataType,
-                                       dstDataType);
-  const wgpu::ShaderModule& shader = device.CreateShaderModule(
-      shaderName.c_str(),
-      [&]() {
-        return GetShaderSourceCopyContiguous(srcDataType, dstDataType);
-      });
-  const wgpu::ComputePipeline& kernel = device.CreateKernel(
-      shader,
-      kernelName.c_str());
   const uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
   GridDims gridDims;
   if (use2DGrid) {
@@ -220,9 +189,16 @@ void CopyContiguous(Device& device,
   } else {
     gridDims.x = std::ceil(dstNumElements / static_cast<float>(workgroupSize));
   }
-  device.RunKernel(kernel,
-                   device.CreateBindGroup(kernel, {src, dst}),
-                   gridDims);
+  RunKernel(device,
+            fmt::format("copy_{}", GetCopyTypeStr(type, use2DGrid)),
+            fmt::format("{}_{}", dstDataType, srcDataType),
+            [&]() {
+              return GetShaderSource(wgsl_source_copy_contiguous,
+                                     dstDataType,
+                                     srcDataType);
+            },
+            {dst, src},
+            gridDims);
 }
 
 }  // namespace betann
