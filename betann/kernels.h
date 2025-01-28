@@ -79,6 +79,16 @@ void CopyGeneral(Device& device,
                  const std::vector<uint32_t>& srcShape,
                  const std::vector<uint32_t>& srcStrides);
 
+// Copy data from virtual src to virtual dst.
+void CopyGeneralBoth(Device& device,
+                     const char* dstDataType,
+                     const wgpu::Buffer& dst,
+                     const std::vector<uint32_t>& dstStrides,
+                     const char* srcDataType,
+                     const wgpu::Buffer& src,
+                     const std::vector<uint32_t>& srcShape,
+                     const std::vector<uint32_t>& srcStrides);
+
 }  // namespace betann
 
 #endif  // BETANN_KERNELS_H_

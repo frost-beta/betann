@@ -34,7 +34,29 @@ class CopyTests : public BetaNNTests {
     dst.SetLabel("destination");
     betann::CopyGeneral(device_,
                         betann::GetWgslDataType<T>(),
+                        dst,
+                        betann::GetWgslDataType<I>(),
+                        device_.CreateBufferFromVector(src),
+                        srcShape,
+                        srcStrides);
+    device_.Flush();
+    return ReadFromBuffer<T>(dst, dstNumElements);
+  }
+
+  template<typename T, typename I>
+  std::vector<T> RunCopyGeneralBoth(const std::vector<uint32_t>& dstStrides,
+                                    const std::vector<I>& src,
+                                    const std::vector<uint32_t>& srcShape,
+                                    const std::vector<uint32_t>& srcStrides) {
+    uint32_t dstNumElements = betann::NumElements(srcShape, dstStrides);
+    wgpu::Buffer dst = device_.CreateBuffer(
+        dstNumElements * sizeof(T),
+        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
+    dst.SetLabel("destination");
+    betann::CopyGeneralBoth(device_,
+                            betann::GetWgslDataType<T>(),
                             dst,
+                            dstStrides,
                             betann::GetWgslDataType<I>(),
                             device_.CreateBufferFromVector(src),
                             srcShape,
@@ -111,7 +133,7 @@ TEST_F(CopyTests, GeneralNonContiguous) {
 TEST_F(CopyTests, General4D) {
   // broadcast from 1x1 to 9x9x9x9
   std::vector<int32_t> src = {89};
-  auto dst = RunCopyGeneral<int32_t>(src, {9, 9, 9, 9}, {0, 0, 0});
+  auto dst = RunCopyGeneral<int32_t>(src, {9, 9, 9, 9}, {0, 0, 0, 0});
   EXPECT_EQ(dst, std::vector<int32_t>(9 * 9 * 9 * 9, 89));
   // boradcast from 1x100 to 9x9x9x100
   src = RandomNumbers<int32_t>(100);
@@ -121,4 +143,31 @@ TEST_F(CopyTests, General4D) {
   src = RandomNumbers<int32_t>(100);
   dst = RunCopyGeneral<int32_t>(src, {1, 2, 3, 4, 100}, {0, 0, 0, 0, 1});
   EXPECT_EQ(dst, Duplicate(src, 1 * 2 * 3 * 4));
+  // reshape from 1x2x3x4x5 to 1x120
+  src = RandomNumbers<int32_t>(1 * 2 * 3 * 4 * 5);
+  dst = RunCopyGeneral<int32_t>(src,
+                                {1, 2, 3, 4, 5},
+                                {120, 60, 20, 5, 1});
+  EXPECT_EQ(dst, src);
+}
+
+TEST_F(CopyTests, GeneralBoth) {
+  auto src = RandomNumbers<int32_t>(1);
+  auto dst = RunCopyGeneralBoth<int32_t>({0, 0}, src, {4, 4}, {0, 0});
+  EXPECT_EQ(dst, src);
+  src = RandomNumbers<int32_t>(4);
+  dst = RunCopyGeneralBoth<int32_t>({1, 2}, src, {2, 2}, {2, 1});
+  auto transpose = [](const std::vector<int32_t> v) -> std::vector<int32_t> {
+    return {v[0], v[2], v[1], v[3]};
+  };
+  EXPECT_EQ(dst, transpose(src));
+}
+
+TEST_F(CopyTests, GeneralBoth4D) {
+  auto src = RandomNumbers<int32_t>(1 * 2 * 3 * 4 * 5);
+  auto dst = RunCopyGeneralBoth<int32_t>({120, 60, 20, 5, 1},
+                                         src,
+                                         {1, 2, 3, 4, 5},
+                                         {120, 60, 20, 5, 1});
+  EXPECT_EQ(dst, src);
 }

@@ -230,4 +230,34 @@ void CopyGeneral(Device& device,
             GetGridDimsGeneral(srcShape, workgroupSize, workPerThread));
 }
 
+void CopyGeneralBoth(Device& device,
+                     const char* dstDataType,
+                     const wgpu::Buffer& dst,
+                     const std::vector<uint32_t>& dstStrides,
+                     const char* srcDataType,
+                     const wgpu::Buffer& src,
+                     const std::vector<uint32_t>& srcShape,
+                     const std::vector<uint32_t>& srcStrides) {
+  const uint32_t workPerThread = 2;
+  const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
+  RunKernel(device,
+            srcShape.size() > 3
+                ? fmt::format("copy_gg_n{}", workPerThread)
+                : fmt::format("copy_gg{}", srcShape.size()),
+            fmt::format("{}_{}", dstDataType, srcDataType),
+            [&]() {
+              return GetShaderSource(wgsl_source_copy_general_both,
+                                     dstDataType,
+                                     srcDataType);
+            },
+            {
+              dst,
+              device.CreateBufferFromVector(dstStrides),
+              src,
+              device.CreateBufferFromVector(srcShape),
+              device.CreateBufferFromVector(srcStrides),
+            },
+            GetGridDimsGeneral(srcShape, workgroupSize, workPerThread));
+}
+
 }  // namespace betann
