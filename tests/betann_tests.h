@@ -1,6 +1,4 @@
-#include <algorithm>
 #include <cstring>
-#include <numeric>
 
 #include <betann/betann.h>
 #include <gtest/gtest.h>

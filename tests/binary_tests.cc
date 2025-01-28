@@ -32,9 +32,7 @@ class BinaryTests : public BetaNNTests {
                                     const std::vector<uint32_t>& aStrides,
                                     const std::vector<I>& b,
                                     const std::vector<uint32_t>& bStrides) {
-    size_t outputNumElements = std::accumulate(shape.begin(), shape.end(),
-                                               1,
-                                               std::multiplies<uint32_t>());
+    uint32_t outputNumElements = betann::NumElements(shape);
     wgpu::Buffer output = device_.CreateBuffer(
         outputNumElements * sizeof(T),
         wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
@@ -159,9 +157,7 @@ TEST_F(BinaryTests, GeneralNonContiguous) {
 TEST_F(BinaryTests, GeneralLargeArrays) {
   std::vector<uint32_t> shape = {33, 33, 33};
   std::vector<uint32_t> strides = {33 * 33, 33, 1};
-  size_t outputNumElements = std::accumulate(shape.begin(), shape.end(),
-                                             1,
-                                             std::multiplies<uint32_t>());
+  uint32_t outputNumElements = betann::NumElements(shape);
   std::vector<float> a(outputNumElements);
   std::fill(a.begin(), a.end(), 8);
   std::vector<float> b(outputNumElements);
@@ -199,9 +195,7 @@ TEST_F(BinaryTests, General4D) {
 TEST_F(BinaryTests, General4DLargeArrays) {
   std::vector<uint32_t> shape = {33, 33, 33, 33};
   std::vector<uint32_t> strides = {33 * 33 * 33, 33 * 33, 33, 1};
-  size_t outputNumElements = std::accumulate(shape.begin(), shape.end(),
-                                             1,
-                                             std::multiplies<uint32_t>());
+  uint32_t outputNumElements = betann::NumElements(shape);
   std::vector<float> a(outputNumElements);
   std::iota(a.begin(), a.end(), 1);
   std::vector<float> b(outputNumElements);

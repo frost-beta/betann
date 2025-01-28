@@ -1,12 +1,9 @@
 #include "betann/kernels.h"
 
-#include <iostream>
-#include <functional>
-#include <numeric>
-
 #include <absl/strings/substitute.h>
 #include <fmt/format.h>
 
+#include "betann/utils.h"
 #include "wgsl_sources.h"
 
 namespace betann {
@@ -120,9 +117,7 @@ void BinaryOpGeneral(Device& device,
                      const wgpu::Buffer& b,
                      size_t bNumElements,
                      const std::vector<uint32_t>& bStrides) {
-  size_t outputNumElements = std::accumulate(shape.begin(), shape.end(),
-                                             1,
-                                             std::multiplies<uint32_t>());
+  size_t outputNumElements = NumElements(shape);
   if (aNumElements > UINT32_MAX ||
       bNumElements > UINT32_MAX ||
       outputNumElements > UINT32_MAX) {
