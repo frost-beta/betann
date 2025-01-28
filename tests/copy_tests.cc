@@ -56,6 +56,14 @@ class CopyTests : public BetaNNTests {
   std::mt19937 mt_;
 };
 
+template<typename T>
+std::vector<T> Duplicate(const std::vector<T>& vec, size_t times) {
+  std::vector<T> ret;
+  for (size_t i = 0; i < times; ++i)
+    ret.insert(ret.end(), vec.begin(), vec.end());
+  return ret;
+}
+
 TEST_F(CopyTests, SmallArrays) {
   auto src = RandomNumbers<int32_t>(100);
   auto dst = RunCopyContiguous<int32_t>(betann::CopyType::Vector,
@@ -90,14 +98,27 @@ TEST_F(CopyTests, GeneralContiguous) {
 }
 
 TEST_F(CopyTests, GeneralNonContiguous) {
+  // broadcast from 1x1 to 4x4x4
   std::vector<int32_t> src = {89};
   auto dst = RunCopyGeneral<int32_t>(src, {4, 4, 4}, {0, 0, 0});
   EXPECT_EQ(dst, std::vector<int32_t>(64, 89));
-  // boradcast from 1x100 to 4x100
+  // boradcast from 1x300 to 4x300
   src = RandomNumbers<int32_t>(300);
   dst = RunCopyGeneral<int32_t>(src, {4, 300}, {0, 1});
-  // src = 4 x src
-  src.insert(src.end(), src.begin(), src.end());
-  src.insert(src.end(), src.begin(), src.end());
-  EXPECT_EQ(dst, src);
+  EXPECT_EQ(dst, Duplicate(src, 4));
+}
+
+TEST_F(CopyTests, General4D) {
+  // broadcast from 1x1 to 9x9x9x9
+  std::vector<int32_t> src = {89};
+  auto dst = RunCopyGeneral<int32_t>(src, {9, 9, 9, 9}, {0, 0, 0});
+  EXPECT_EQ(dst, std::vector<int32_t>(9 * 9 * 9 * 9, 89));
+  // boradcast from 1x100 to 9x9x9x100
+  src = RandomNumbers<int32_t>(100);
+  dst = RunCopyGeneral<int32_t>(src, {9, 9, 9, 100}, {0, 0, 0, 1});
+  EXPECT_EQ(dst, Duplicate(src, 9 * 9 * 9));
+  // boradcast from 1x100 to 1x2x3x4x100
+  src = RandomNumbers<int32_t>(100);
+  dst = RunCopyGeneral<int32_t>(src, {1, 2, 3, 4, 100}, {0, 0, 0, 0, 1});
+  EXPECT_EQ(dst, Duplicate(src, 1 * 2 * 3 * 4));
 }

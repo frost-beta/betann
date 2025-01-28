@@ -36,3 +36,35 @@ fn copy_g3(@builtin(global_invocation_id) gid: vec3<u32>) {
   let dst_idx = gid.x + src_shape[1] * (gid.y + src_shape[2] * gid.z);
   dst[dst_idx] = dst_dtype(src[src_idx]);
 }
+
+@compute @workgroup_size(num_threads, num_threads, num_threads)
+fn copy_g_n2(@builtin(global_invocation_id) gid: vec3<u32>) {
+  // Check boundries.
+  const work_per_thread: u32 = 2;
+  let ndim = i32(arrayLength(&src_shape));
+  let dim0 = src_shape[ndim - 1];
+  let dim1 = src_shape[ndim - 2];
+  var rest: u32 = 1;
+  for (var d: i32 = ndim - 3; d >= 0; d--) {
+    rest *= src_shape[d];
+  }
+  if (work_per_thread * gid.x >= dim0 || gid.y >= dim1 || gid.z >= rest) {
+    return;
+  }
+  // Get index in src and dst.
+  var elem_z = gid.z;
+  var src_idx = work_per_thread * gid.x * src_strides[ndim - 1] + gid.y * src_strides[ndim - 2];
+  for (var d: i32 = ndim - 3; d >= 0; d--) {
+    src_idx += (elem_z % src_shape[d]) * src_strides[d];
+    elem_z /= src_shape[d];
+  }
+  let dst_idx = work_per_thread * gid.x + dim0 * (gid.y + dim1 * gid.z);
+  // Iterate and assign.
+  let src_xstride = src_strides[ndim - 1];
+  for (var i: u32 = 0;
+       i < work_per_thread && (work_per_thread * gid.x + i) < dim0;
+       i++) {
+    dst[dst_idx + i] = dst_dtype(src[src_idx]);
+    src_idx += src_xstride;
+  }
+}

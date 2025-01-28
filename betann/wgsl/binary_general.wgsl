@@ -67,14 +67,13 @@ fn binary_g_n2_$2(@builtin(global_invocation_id) gid: vec3<u32>) {
     z_idx /= shape[d];
   }
   // Iterate and assign.
-  var out_idx = work_per_thread * gid.x + dim0 * (gid.y + dim1 * gid.z);
+  let out_idx = work_per_thread * gid.x + dim0 * (gid.y + dim1 * gid.z);
   for (var i: u32 = 0;
        i < work_per_thread && (work_per_thread * gid.x + i) < dim0;
        i++) {
-    c[out_idx] = $2(a[a_idx], b[b_idx]);
+    c[out_idx + i] = $2(a[a_idx], b[b_idx]);
     a_idx += a_strides[ndim - 1];
     b_idx += b_strides[ndim - 1];
-    out_idx++;
   }
 }
 
