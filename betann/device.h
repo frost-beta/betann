@@ -80,6 +80,10 @@ class Device {
   std::set<uint64_t> futures_;
 };
 
+// Allow users to avoid the wgpu namespace in their code.
+using Buffer = wgpu::Buffer;
+using BufferUsage = wgpu::BufferUsage;
+
 }  // namespace betann
 
 #endif  // BETANN_DEVICE_H_
