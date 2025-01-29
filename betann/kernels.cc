@@ -10,28 +10,6 @@ namespace betann {
 
 namespace {
 
-inline const char* GetBinaryOpTypeStr(BinaryOpType type, bool largeArray) {
-  switch (type) {
-    case BinaryOpType::ScalarScalar:
-      return "ss";
-    case BinaryOpType::ScalarVector:
-      return largeArray ? "sv2" : "sv";
-    case BinaryOpType::VectorScalar:
-      return largeArray ? "vs2" : "vs";
-    case BinaryOpType::VectorVector:
-      return largeArray ? "vv2" : "vv";
-  }
-}
-
-inline const char* GetCopyTypeStr(CopyType type, bool largeArray) {
-  switch (type) {
-    case CopyType::Scalar:
-      return largeArray ? "s2" : "s";
-    case CopyType::Vector:
-      return largeArray ? "v2" : "v";
-  }
-}
-
 template<typename... Args>
 inline std::string GetShaderSource(Args&&... args) {
   return absl::Substitute(std::forward<Args>(args)...);
@@ -43,22 +21,22 @@ inline std::string Append(std::string prefix, Args&&... args) {
   return prefix;
 }
 
-GridDims GetGridDimsContiguous(uint32_t numElements,
-                               uint32_t threadsPerDim,
-                               uint32_t workgroupSize) {
-  GridDims gridDims;
+Dims3 GetWorkgroupsCountContiguous(uint32_t numElements,
+                                   uint32_t threadsPerDim,
+                                   uint32_t workgroupSize) {
+  Dims3 workgroupsCount;
   if (numElements > threadsPerDim) {
-    gridDims.x = std::floor(threadsPerDim / static_cast<float>(workgroupSize));
-    gridDims.y = std::ceil(numElements / static_cast<float>(gridDims.x));
+    workgroupsCount.x = DivFloor(threadsPerDim, workgroupSize);
+    workgroupsCount.y = DivCeil(numElements, workgroupsCount.x);
   } else {
-    gridDims.x = std::ceil(numElements / static_cast<float>(workgroupSize));
+    workgroupsCount.y = DivCeil(numElements, workgroupSize);
   }
-  return gridDims;
+  return workgroupsCount;
 }
 
-GridDims GetGridDimsGeneral(const std::vector<uint32_t>& shape,
-                            uint32_t workgroupSize,
-                            uint32_t workPerThread) {
+Dims3 GetWorkgroupsCountGeneral(const std::vector<uint32_t>& shape,
+                                uint32_t workgroupSize,
+                                uint32_t workPerThread) {
   size_t numElements = NumElements(shape);
   size_t ndim = shape.size();
   size_t dim0 = ndim > 0 ? shape[ndim - 1] : 1;
@@ -67,11 +45,11 @@ GridDims GetGridDimsGeneral(const std::vector<uint32_t>& shape,
   if (ndim > 3) {
     dim0 = (dim0 + workPerThread - 1) / workPerThread;
   }
-  GridDims gridDims;
-  gridDims.x = std::ceil(dim0 / static_cast<float>(workgroupSize));
-  gridDims.y = std::ceil(dim1 / static_cast<float>(workgroupSize));
-  gridDims.z = std::ceil(rest / static_cast<float>(workgroupSize));
-  return gridDims;
+  Dims3 workgroupsCount;
+  workgroupsCount.x = DivCeil(dim0, workgroupSize);
+  workgroupsCount.y = DivCeil(dim1, workgroupSize);
+  workgroupsCount.z = DivCeil(rest, workgroupSize);
+  return workgroupsCount;
 }
 
 template<typename F>
@@ -80,7 +58,7 @@ void RunKernel(Device& device,
                const std::string& shaderSuffix,
                F&& getSource,
                std::initializer_list<wgpu::Buffer> buffers,
-               GridDims gridDims) {
+               Dims3 workgroupsCount) {
   const wgpu::ShaderModule& shader = device.CreateShaderModule(
       fmt::format("{}_{}", kernelName, shaderSuffix).c_str(),
       std::forward<F>(getSource));
@@ -89,7 +67,7 @@ void RunKernel(Device& device,
       kernelName.c_str());
   device.RunKernel(kernel,
                    device.CreateBindGroup(kernel, std::move(buffers)),
-                   gridDims);
+                   workgroupsCount);
 }
 
 }  // namespace
@@ -112,10 +90,23 @@ void BinaryOpContiguous(Device& device,
   uint32_t maxThreadsPerGridDim =
       device.GetLimits().maxComputeWorkgroupsPerDimension * workgroupSize;
   bool use2DGrid = outputNumElements > maxThreadsPerGridDim;
+  const char* typeStr = nullptr;
+  switch (type) {
+    case BinaryOpType::ScalarScalar:
+      typeStr = "ss";
+      break;
+    case BinaryOpType::ScalarVector:
+      typeStr = use2DGrid ? "sv2" : "sv";
+      break;
+    case BinaryOpType::VectorScalar:
+      typeStr = use2DGrid ? "vs2" : "vs";
+      break;
+    case BinaryOpType::VectorVector:
+      typeStr = use2DGrid ? "vv2" : "vv";
+      break;
+  }
   RunKernel(device,
-            fmt::format("binary_{}_{}",
-                        GetBinaryOpTypeStr(type, use2DGrid),
-                        name),
+            fmt::format("binary_{}_{}", typeStr, name),
             fmt::format("{}_{}", outputDataType, inputDataType),
             [&]() {
               return Append(GetShaderSource(wgsl_source_binary_contiguous,
@@ -125,9 +116,9 @@ void BinaryOpContiguous(Device& device,
                             wgsl_source_binary_ops);
             },
             {output, a, b},
-            GetGridDimsContiguous(outputNumElements,
-                                  maxThreadsPerGridDim,
-                                  workgroupSize));
+            GetWorkgroupsCountContiguous(outputNumElements,
+                                         maxThreadsPerGridDim,
+                                         workgroupSize));
 }
 
 void BinaryOpGeneral(Device& device,
@@ -169,7 +160,7 @@ void BinaryOpGeneral(Device& device,
               b,
               device.CreateBufferFromVector(bStrides),
             },
-            GetGridDimsGeneral(shape, workgroupSize, workPerThread));
+            GetWorkgroupsCountGeneral(shape, workgroupSize, workPerThread));
 }
 
 void CopyContiguous(Device& device,
@@ -188,8 +179,17 @@ void CopyContiguous(Device& device,
   uint32_t maxThreadsPerGridDim =
       device.GetLimits().maxComputeWorkgroupsPerDimension * workgroupSize;
   bool use2DGrid = dstNumElements > maxThreadsPerGridDim;
+  const char* typeStr = nullptr;
+  switch (type) {
+    case CopyType::Scalar:
+      typeStr = use2DGrid ? "s2" : "s";
+      break;
+    case CopyType::Vector:
+      typeStr = use2DGrid ? "v2" : "v";
+      break;
+  }
   RunKernel(device,
-            fmt::format("copy_{}", GetCopyTypeStr(type, use2DGrid)),
+            fmt::format("copy_{}", typeStr),
             fmt::format("{}_{}", dstDataType, srcDataType),
             [&]() {
               return GetShaderSource(wgsl_source_copy_contiguous,
@@ -197,9 +197,9 @@ void CopyContiguous(Device& device,
                                      srcDataType);
             },
             {dst, src},
-            GetGridDimsContiguous(dstNumElements,
-                                  maxThreadsPerGridDim,
-                                  workgroupSize));
+            GetWorkgroupsCountContiguous(dstNumElements,
+                                         maxThreadsPerGridDim,
+                                         workgroupSize));
 }
 
 void CopyGeneral(Device& device,
@@ -227,7 +227,7 @@ void CopyGeneral(Device& device,
               device.CreateBufferFromVector(srcShape),
               device.CreateBufferFromVector(srcStrides),
             },
-            GetGridDimsGeneral(srcShape, workgroupSize, workPerThread));
+            GetWorkgroupsCountGeneral(srcShape, workgroupSize, workPerThread));
 }
 
 void CopyGeneralBoth(Device& device,
@@ -257,7 +257,7 @@ void CopyGeneralBoth(Device& device,
               device.CreateBufferFromVector(srcShape),
               device.CreateBufferFromVector(srcStrides),
             },
-            GetGridDimsGeneral(srcShape, workgroupSize, workPerThread));
+            GetWorkgroupsCountGeneral(srcShape, workgroupSize, workPerThread));
 }
 
 }  // namespace betann

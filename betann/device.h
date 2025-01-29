@@ -10,7 +10,7 @@
 
 namespace betann {
 
-struct GridDims {
+struct Dims3 {
   uint32_t x = 1;
   uint32_t y = 1;
   uint32_t z = 1;
@@ -53,7 +53,7 @@ class Device {
                                   std::initializer_list<wgpu::Buffer> buffers);
   void RunKernel(const wgpu::ComputePipeline& kernel,
                  const wgpu::BindGroup& bindGroup,
-                 GridDims gridDims);
+                 Dims3 workgroupsCount);
 
   const wgpu::Limits& GetLimits() const { return limits_; }
 

@@ -241,12 +241,14 @@ wgpu::BindGroup Device::CreateBindGroup(
 
 void Device::RunKernel(const wgpu::ComputePipeline& kernel,
                        const wgpu::BindGroup& bindGroup,
-                       GridDims gridDims) {
+                       Dims3 workgroupsCount) {
   EnsureEncoder();
   wgpu::ComputePassEncoder pass = encoder_.BeginComputePass();
   pass.SetPipeline(kernel);
   pass.SetBindGroup(0, bindGroup);
-  pass.DispatchWorkgroups(gridDims.x, gridDims.y, gridDims.z);
+  pass.DispatchWorkgroups(workgroupsCount.x,
+                          workgroupsCount.y,
+                          workgroupsCount.z);
   pass.End();
 }
 
