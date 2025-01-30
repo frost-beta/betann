@@ -265,8 +265,39 @@ void RandomBitsContiguous(Device& device,
             },
             {
               out,
-              keys,
               device.CreateBufferFromData(&bytesPerkey, sizeof(uint32_t)),
+              keys,
+            },
+            workgroupsCount);
+}
+
+void RandomBitsGeneral(Device& device,
+                       DataType outDataType,
+                       const wgpu::Buffer& out,
+                       uint32_t outNumElements,
+                       const wgpu::Buffer& keys,
+                       const std::vector<uint32_t>& keysShape,
+                       const std::vector<uint32_t>& keysStrides) {
+  const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
+  uint32_t numKeys = NumElements(keysShape) / 2;
+  uint32_t bytesPerkey = outNumElements * SizeOf(outDataType) / numKeys;
+  uint32_t outPerKey = DivCeil(bytesPerkey, 4u);
+  Dims3 workgroupsCount;
+  workgroupsCount.x = DivCeil(numKeys, workgroupSize);
+  workgroupsCount.y = DivCeil(outPerKey / 2 + (outPerKey % 2), workgroupSize);
+  RunKernel(device,
+            "rbits",
+            "",
+            [&]() {
+              return Append(GetShaderSource(wgsl_source_random_general),
+                            wgsl_source_random_utils);
+            },
+            {
+              out,
+              device.CreateBufferFromData(&bytesPerkey, sizeof(uint32_t)),
+              keys,
+              device.CreateBufferFromVector(keysShape),
+              device.CreateBufferFromVector(keysStrides),
             },
             workgroupsCount);
 }

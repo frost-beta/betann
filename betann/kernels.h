@@ -96,6 +96,15 @@ void RandomBitsContiguous(Device& device,
                           const wgpu::Buffer& keys,
                           uint32_t keysNumElements);
 
+// Generate random bits from virual keys.
+void RandomBitsGeneral(Device& device,
+                       DataType outDataType,
+                       const wgpu::Buffer& out,
+                       uint32_t outNumElements,
+                       const wgpu::Buffer& keys,
+                       const std::vector<uint32_t>& keysShape,
+                       const std::vector<uint32_t>& keysStrides);
+
 }  // namespace betann
 
 #endif  // BETANN_KERNELS_H_

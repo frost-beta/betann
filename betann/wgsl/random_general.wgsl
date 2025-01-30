@@ -5,9 +5,11 @@ override num_threads: u32 = 8;
 @group(0) @binding(0) var<storage, read_write> out: array<u32>;
 @group(0) @binding(1) var<storage, read> bytes_per_key: u32;
 @group(0) @binding(2) var<storage, read> keys: array<u32>;
+@group(0) @binding(3) var<storage, read> keys_shape: array<u32>;
+@group(0) @binding(4) var<storage, read> keys_strides: array<u32>;
 
 @compute @workgroup_size(num_threads, num_threads, 1)
-fn rbits_c(@builtin(global_invocation_id) gid: vec3<u32>) {
+fn rbits(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (gid.x >= arrayLength(&keys)) {
     return;
   }
@@ -17,7 +19,19 @@ fn rbits_c(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (gid.y >= half_size + odd) {
     return;
   }
-  let key = vec2<u32>(keys[2 * gid.x], keys[2 * gid.x + 1]);
+  var k1_elem = 2 * gid.x;
+  var k1_idx: u32 = 0;
+  for (var i = i32(arrayLength(&keys_shape)) - 1; i >= 0 && k1_elem > 0; i--) {
+    k1_idx += (k1_elem % keys_shape[i]) * keys_strides[i];
+    k1_elem /= keys_shape[i];
+  }
+  var k2_elem = 2 * gid.x + 1;
+  var k2_idx: u32 = 0;
+  for (var i = i32(arrayLength(&keys_shape)) - 1; i >= 0 && k2_elem > 0; i--) {
+    k2_idx += (k2_elem % keys_shape[i]) * keys_strides[i];
+    k2_elem /= keys_shape[i];
+  }
+  let key = vec2<u32>(keys[k1_idx], keys[k2_idx]);
   let drop_last = odd == 1 && gid.y == half_size;
   let bits = threefry2x32_hash(
       key,
