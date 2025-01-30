@@ -77,15 +77,10 @@ void BinaryOpContiguous(Device& device,
                         BinaryOpType type,
                         const char* outputDataType,
                         const wgpu::Buffer& output,
-                        size_t outputNumElements,
+                        uint32_t outputNumElements,
                         const char* inputDataType,
                         const wgpu::Buffer& a,
                         const wgpu::Buffer& b) {
-  if (outputNumElements > UINT32_MAX) {
-    throw std::runtime_error(
-        fmt::format("Number of elements ({}) exceeds maximum index.",
-                    outputNumElements));
-  }
   const uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
   uint32_t maxThreadsPerGridDim =
       device.GetLimits().maxComputeWorkgroupsPerDimension * workgroupSize;
@@ -167,14 +162,9 @@ void CopyContiguous(Device& device,
                     CopyType type,
                     const char* dstDataType,
                     const wgpu::Buffer& dst,
-                    size_t dstNumElements,
+                    uint32_t dstNumElements,
                     const char* srcDataType,
                     const wgpu::Buffer& src) {
-  if (dstNumElements > UINT32_MAX) {
-    throw std::runtime_error(
-        fmt::format("Number of elements ({}) exceeds maximum index.",
-                    dstNumElements));
-  }
   const uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
   uint32_t maxThreadsPerGridDim =
       device.GetLimits().maxComputeWorkgroupsPerDimension * workgroupSize;
@@ -258,6 +248,34 @@ void CopyGeneralBoth(Device& device,
               device.CreateBufferFromVector(srcStrides),
             },
             GetWorkgroupsCountGeneral(srcShape, workgroupSize, workPerThread));
+}
+
+void RandomBitsContiguous(Device& device,
+                          DataType outDataType,
+                          const wgpu::Buffer& out,
+                          uint32_t outNumElements,
+                          const wgpu::Buffer& keys,
+                          uint32_t keysNumElements) {
+  const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
+  uint32_t numKeys = keysNumElements / 2;  // each key consists of 2 items
+  uint32_t bytesPerkey = outNumElements * SizeOf(outDataType) / numKeys;
+  uint32_t outPerKey = DivCeil(bytesPerkey, 4u);
+  Dims3 workgroupsCount;
+  workgroupsCount.x = DivCeil(numKeys, workgroupSize);
+  workgroupsCount.y = DivCeil(outPerKey / 2 + (outPerKey % 2), workgroupSize);
+  RunKernel(device,
+            "rbits_c",
+            "",
+            [&]() {
+              return Append(GetShaderSource(wgsl_source_random_contiguous),
+                            wgsl_source_random_utils);
+            },
+            {
+              out,
+              keys,
+              device.CreateBufferFromData(&bytesPerkey, sizeof(uint32_t)),
+            },
+            workgroupsCount);
 }
 
 }  // namespace betann

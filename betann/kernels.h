@@ -5,6 +5,7 @@
 #include <string>
 
 #include "betann/device.h"
+#include "betann/utils.h"
 
 namespace betann {
 
@@ -34,7 +35,7 @@ void BinaryOpContiguous(Device& device,
                         BinaryOpType type,
                         const char* outputDataType,
                         const wgpu::Buffer& output,
-                        size_t outputNumElements,
+                        uint32_t outputNumElements,
                         const char* inputDataType,
                         const wgpu::Buffer& a,
                         const wgpu::Buffer& b);
@@ -66,7 +67,7 @@ void CopyContiguous(Device& device,
                     CopyType type,
                     const char* dstDataType,
                     const wgpu::Buffer& dst,
-                    size_t dstNumElements,
+                    uint32_t dstNumElements,
                     const char* srcDataType,
                     const wgpu::Buffer& src);
 
@@ -88,6 +89,14 @@ void CopyGeneralBoth(Device& device,
                      const wgpu::Buffer& src,
                      const std::vector<uint32_t>& srcShape,
                      const std::vector<uint32_t>& srcStrides);
+
+// Generate random bits from contiguous keys.
+void RandomBitsContiguous(Device& device,
+                          DataType outDataType,
+                          const wgpu::Buffer& out,
+                          uint32_t outNumElements,
+                          const wgpu::Buffer& keys,
+                          uint32_t keysNumElements);
 
 }  // namespace betann
 
