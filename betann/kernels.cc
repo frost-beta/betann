@@ -123,16 +123,9 @@ void BinaryOpGeneral(Device& device,
                      const std::vector<uint32_t>& shape,
                      const char* inputDataType,
                      const wgpu::Buffer& a,
-                     size_t aNumElements,
                      const std::vector<uint32_t>& aStrides,
                      const wgpu::Buffer& b,
-                     size_t bNumElements,
                      const std::vector<uint32_t>& bStrides) {
-  if (aNumElements > UINT32_MAX || bNumElements > UINT32_MAX) {
-    throw std::runtime_error(
-        fmt::format("Number of elements ({}, {}) exceeds maximum index.",
-                    aNumElements, bNumElements));
-  }
   const uint32_t workPerThread = 2;
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
   RunKernel(device,

@@ -44,10 +44,8 @@ class BinaryTests : public BetaNNTests {
                             shape,
                             betann::GetWgslDataType<I>(),
                             device_.CreateBufferFromVector(a),
-                            a.size(),
                             aStrides,
                             device_.CreateBufferFromVector(b),
-                            b.size(),
                             bStrides);
     device_.Flush();
     return ReadFromBuffer<T>(output, outputNumElements);

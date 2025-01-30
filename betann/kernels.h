@@ -48,10 +48,8 @@ void BinaryOpGeneral(Device& device,
                      const std::vector<uint32_t>& shape,
                      const char* inputDataType,
                      const wgpu::Buffer& a,
-                     size_t aNumElements,
                      const std::vector<uint32_t>& aStrides,
                      const wgpu::Buffer& b,
-                     size_t bNumElements,
                      const std::vector<uint32_t>& bStrides);
 
 enum class CopyType {
