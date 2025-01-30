@@ -75,10 +75,10 @@ void RunKernel(Device& device,
 void BinaryOpContiguous(Device& device,
                         const char* name,
                         BinaryOpType type,
-                        const char* outputDataType,
+                        DataType outputDataType,
                         const wgpu::Buffer& output,
                         uint32_t outputNumElements,
-                        const char* inputDataType,
+                        DataType inputDataType,
                         const wgpu::Buffer& a,
                         const wgpu::Buffer& b) {
   const uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
@@ -102,11 +102,13 @@ void BinaryOpContiguous(Device& device,
   }
   RunKernel(device,
             fmt::format("binary_{}_{}", typeStr, name),
-            fmt::format("{}_{}", outputDataType, inputDataType),
+            fmt::format("{}_{}",
+                        WgslType(outputDataType),
+                        WgslType(inputDataType)),
             [&]() {
               return Append(GetShaderSource(wgsl_source_binary_contiguous,
-                                            outputDataType,
-                                            inputDataType,
+                                            WgslType(outputDataType),
+                                            WgslType(inputDataType),
                                             name),
                             wgsl_source_binary_ops);
             },
@@ -118,10 +120,10 @@ void BinaryOpContiguous(Device& device,
 
 void BinaryOpGeneral(Device& device,
                      const char* name,
-                     const char* outputDataType,
+                     DataType outputDataType,
                      const wgpu::Buffer& output,
                      const std::vector<uint32_t>& shape,
-                     const char* inputDataType,
+                     DataType inputDataType,
                      const wgpu::Buffer& a,
                      const std::vector<uint32_t>& aStrides,
                      const wgpu::Buffer& b,
@@ -132,11 +134,13 @@ void BinaryOpGeneral(Device& device,
             shape.size() > 3
                 ? fmt::format("binary_g_n{}_{}", workPerThread, name)
                 : fmt::format("binary_g{}_{}", shape.size(), name),
-            fmt::format("{}_{}", outputDataType, inputDataType),
+            fmt::format("{}_{}",
+                        WgslType(outputDataType),
+                        WgslType(inputDataType)),
             [&]() {
               return Append(GetShaderSource(wgsl_source_binary_general,
-                                            outputDataType,
-                                            inputDataType,
+                                            WgslType(outputDataType),
+                                            WgslType(inputDataType),
                                             name),
                             wgsl_source_binary_ops);
             },
@@ -153,10 +157,10 @@ void BinaryOpGeneral(Device& device,
 
 void CopyContiguous(Device& device,
                     CopyType type,
-                    const char* dstDataType,
+                    DataType dstDataType,
                     const wgpu::Buffer& dst,
                     uint32_t dstNumElements,
-                    const char* srcDataType,
+                    DataType srcDataType,
                     const wgpu::Buffer& src) {
   const uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
   uint32_t maxThreadsPerGridDim =
@@ -173,11 +177,11 @@ void CopyContiguous(Device& device,
   }
   RunKernel(device,
             fmt::format("copy_{}", typeStr),
-            fmt::format("{}_{}", dstDataType, srcDataType),
+            fmt::format("{}_{}", WgslType(dstDataType), WgslType(srcDataType)),
             [&]() {
               return GetShaderSource(wgsl_source_copy_contiguous,
-                                     dstDataType,
-                                     srcDataType);
+                                     WgslType(dstDataType),
+                                     WgslType(srcDataType));
             },
             {dst, src},
             GetWorkgroupsCountContiguous(dstNumElements,
@@ -186,9 +190,9 @@ void CopyContiguous(Device& device,
 }
 
 void CopyGeneral(Device& device,
-                 const char* dstDataType,
+                 DataType dstDataType,
                  const wgpu::Buffer& dst,
-                 const char* srcDataType,
+                 DataType srcDataType,
                  const wgpu::Buffer& src,
                  const std::vector<uint32_t>& srcShape,
                  const std::vector<uint32_t>& srcStrides) {
@@ -198,11 +202,11 @@ void CopyGeneral(Device& device,
             srcShape.size() > 3
                 ? fmt::format("copy_g_n{}", workPerThread)
                 : fmt::format("copy_g{}", srcShape.size()),
-            fmt::format("{}_{}", dstDataType, srcDataType),
+            fmt::format("{}_{}", WgslType(dstDataType), WgslType(srcDataType)),
             [&]() {
               return GetShaderSource(wgsl_source_copy_general,
-                                     dstDataType,
-                                     srcDataType);
+                                     WgslType(dstDataType),
+                                     WgslType(srcDataType));
             },
             {
               dst,
@@ -214,10 +218,10 @@ void CopyGeneral(Device& device,
 }
 
 void CopyGeneralBoth(Device& device,
-                     const char* dstDataType,
+                     DataType dstDataType,
                      const wgpu::Buffer& dst,
                      const std::vector<uint32_t>& dstStrides,
-                     const char* srcDataType,
+                     DataType srcDataType,
                      const wgpu::Buffer& src,
                      const std::vector<uint32_t>& srcShape,
                      const std::vector<uint32_t>& srcStrides) {
@@ -227,11 +231,11 @@ void CopyGeneralBoth(Device& device,
             srcShape.size() > 3
                 ? fmt::format("copy_gg_n{}", workPerThread)
                 : fmt::format("copy_gg{}", srcShape.size()),
-            fmt::format("{}_{}", dstDataType, srcDataType),
+            fmt::format("{}_{}", WgslType(dstDataType), WgslType(srcDataType)),
             [&]() {
               return GetShaderSource(wgsl_source_copy_general_both,
-                                     dstDataType,
-                                     srcDataType);
+                                     WgslType(dstDataType),
+                                     WgslType(srcDataType));
             },
             {
               dst,

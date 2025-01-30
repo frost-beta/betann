@@ -15,10 +15,10 @@ class BinaryTests : public BetaNNTests {
     betann::BinaryOpContiguous(device_,
                                name,
                                type,
-                               betann::GetWgslDataType<T>(),
+                               betann::GetDataType<T>(),
                                output,
                                outputNumElements,
-                               betann::GetWgslDataType<I>(),
+                               betann::GetDataType<I>(),
                                device_.CreateBufferFromVector(a),
                                device_.CreateBufferFromVector(b));
     device_.Flush();
@@ -39,10 +39,10 @@ class BinaryTests : public BetaNNTests {
     output.SetLabel("output");
     betann::BinaryOpGeneral(device_,
                             name,
-                            betann::GetWgslDataType<T>(),
+                            betann::GetDataType<T>(),
                             output,
                             shape,
-                            betann::GetWgslDataType<I>(),
+                            betann::GetDataType<I>(),
                             device_.CreateBufferFromVector(a),
                             aStrides,
                             device_.CreateBufferFromVector(b),

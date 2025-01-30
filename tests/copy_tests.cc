@@ -14,10 +14,10 @@ class CopyTests : public BetaNNTests {
     dst.SetLabel("destination");
     betann::CopyContiguous(device_,
                            type,
-                           betann::GetWgslDataType<T>(),
+                           betann::GetDataType<T>(),
                            dst,
                            dstNumElements,
-                           betann::GetWgslDataType<I>(),
+                           betann::GetDataType<I>(),
                            device_.CreateBufferFromVector(src));
     device_.Flush();
     return ReadFromBuffer<T>(dst, dstNumElements);
@@ -33,9 +33,9 @@ class CopyTests : public BetaNNTests {
         wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
     dst.SetLabel("destination");
     betann::CopyGeneral(device_,
-                        betann::GetWgslDataType<T>(),
+                        betann::GetDataType<T>(),
                         dst,
-                        betann::GetWgslDataType<I>(),
+                        betann::GetDataType<I>(),
                         device_.CreateBufferFromVector(src),
                         srcShape,
                         srcStrides);
@@ -54,10 +54,10 @@ class CopyTests : public BetaNNTests {
         wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
     dst.SetLabel("destination");
     betann::CopyGeneralBoth(device_,
-                            betann::GetWgslDataType<T>(),
+                            betann::GetDataType<T>(),
                             dst,
                             dstStrides,
-                            betann::GetWgslDataType<I>(),
+                            betann::GetDataType<I>(),
                             device_.CreateBufferFromVector(src),
                             srcShape,
                             srcStrides);

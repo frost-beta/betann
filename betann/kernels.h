@@ -9,15 +9,6 @@
 
 namespace betann {
 
-template<typename T>
-inline const char* GetWgslDataType() {
-  throw std::runtime_error("Unsupported C++ data type in WGSL.");
-}
-template<> inline const char* GetWgslDataType<bool>() { return "bool"; }
-template<> inline const char* GetWgslDataType<int32_t>() { return "i32"; }
-template<> inline const char* GetWgslDataType<uint32_t>() { return "u32"; }
-template<> inline const char* GetWgslDataType<float>() { return "f32"; }
-
 enum class BinaryOpType {
   // Both operands are scalars.
   ScalarScalar,
@@ -33,20 +24,20 @@ enum class BinaryOpType {
 void BinaryOpContiguous(Device& device,
                         const char* name,
                         BinaryOpType type,
-                        const char* outputDataType,
+                        DataType outputDataType,
                         const wgpu::Buffer& output,
                         uint32_t outputNumElements,
-                        const char* inputDataType,
+                        DataType inputDataType,
                         const wgpu::Buffer& a,
                         const wgpu::Buffer& b);
 
 // Run binary operands on virtual inputs and write to contiguous output.
 void BinaryOpGeneral(Device& device,
                      const char* name,
-                     const char* outputDataType,
+                     DataType outputDataType,
                      const wgpu::Buffer& output,
                      const std::vector<uint32_t>& shape,
-                     const char* inputDataType,
+                     DataType inputDataType,
                      const wgpu::Buffer& a,
                      const std::vector<uint32_t>& aStrides,
                      const wgpu::Buffer& b,
@@ -63,27 +54,27 @@ enum class CopyType {
 // Copy data from src to dst contiguously.
 void CopyContiguous(Device& device,
                     CopyType type,
-                    const char* dstDataType,
+                    DataType dstDataType,
                     const wgpu::Buffer& dst,
                     uint32_t dstNumElements,
-                    const char* srcDataType,
+                    DataType srcDataType,
                     const wgpu::Buffer& src);
 
 // Copy data from virtual src to contiguous dst.
 void CopyGeneral(Device& device,
-                 const char* dstDataType,
+                 DataType dstDataType,
                  const wgpu::Buffer& dst,
-                 const char* srcDataType,
+                 DataType srcDataType,
                  const wgpu::Buffer& src,
                  const std::vector<uint32_t>& srcShape,
                  const std::vector<uint32_t>& srcStrides);
 
 // Copy data from virtual src to virtual dst.
 void CopyGeneralBoth(Device& device,
-                     const char* dstDataType,
+                     DataType dstDataType,
                      const wgpu::Buffer& dst,
                      const std::vector<uint32_t>& dstStrides,
-                     const char* srcDataType,
+                     DataType srcDataType,
                      const wgpu::Buffer& src,
                      const std::vector<uint32_t>& srcShape,
                      const std::vector<uint32_t>& srcStrides);

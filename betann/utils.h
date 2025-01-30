@@ -27,6 +27,21 @@ inline size_t SizeOf(DataType dataType) {
   }
 }
 
+inline const char* WgslType(DataType dataType) {
+  switch (dataType) {
+    case DataType::bool_:
+      return "bool";
+    case DataType::i32:
+      return "i32";
+    case DataType::u32:
+      return "u32";
+    case DataType::f32:
+      return "f32";
+    case DataType::f16:
+      return "f16";
+  }
+}
+
 template<typename T>
 inline DataType GetDataType() {
   throw std::runtime_error("Unsupported C++ data type in WebGPU.");
