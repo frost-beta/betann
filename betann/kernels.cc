@@ -269,7 +269,7 @@ void RandomBitsContiguous(Device& device,
             },
             {
               out,
-              device.CreateBufferFromData(&bytesPerkey, sizeof(uint32_t)),
+              device.CreateBufferFromScalar(bytesPerkey),
               keys,
             },
             workgroupsCount);
@@ -298,12 +298,58 @@ void RandomBitsGeneral(Device& device,
             },
             {
               out,
-              device.CreateBufferFromData(&bytesPerkey, sizeof(uint32_t)),
+              device.CreateBufferFromScalar(bytesPerkey),
               keys,
               device.CreateBufferFromVector(keysShape),
               device.CreateBufferFromVector(keysStrides),
             },
             workgroupsCount);
+}
+
+void SortSingleBlockContiguous(Device& device,
+                               uint32_t axis,
+                               DataType dataType,
+                               const wgpu::Buffer& out,
+                               const std::vector<uint32_t>& outStrides,
+                               const wgpu::Buffer& input,
+                               const std::vector<uint32_t>& inputShape,
+                               const std::vector<uint32_t>& inputStrides) {
+  const uint32_t workgroupSize = 256;
+  const uint32_t workPerThread = 8;  // TODO(zcbenz): make it dynamic
+  uint32_t sizeSortedAxis = inputShape[axis];
+  if (sizeSortedAxis > workgroupSize * workPerThread) {
+    throw std::runtime_error(
+        fmt::format("Elements number of sorted axis ({}) exceeds limit ({}).",
+                    sizeSortedAxis, workgroupSize * workPerThread));
+  }
+  auto removeAxis = [](const std::vector<uint32_t>& input, uint32_t axis) {
+    auto ret = input;
+    ret.erase(ret.begin() + axis);
+    return ret;
+  };
+  auto outRestStrides = removeAxis(outStrides, axis);
+  auto inputRestStrides = removeAxis(inputStrides, axis);
+  RunKernel(device,
+            "sort_block_c",
+            WgslType(dataType),
+            [&]() {
+              return GetShaderSource(wgsl_source_sort_block_contiguous,
+                                     WgslType(dataType));
+            },
+            {
+              out,
+              device.CreateBufferFromScalar(sizeSortedAxis),
+              device.CreateBufferFromScalar(outStrides[axis]),
+              device.CreateBufferFromScalar(
+                  *std::min_element(outRestStrides.begin(),
+                                    outRestStrides.end())),
+              input,
+              device.CreateBufferFromScalar(inputStrides[axis]),
+              device.CreateBufferFromScalar(
+                  *std::min_element(inputRestStrides.begin(),
+                                    inputRestStrides.end())),
+            },
+            {1, NumElements(inputShape) / sizeSortedAxis, 1});
 }
 
 }  // namespace betann

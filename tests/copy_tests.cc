@@ -1,7 +1,5 @@
 #include "betann_tests.h"
 
-#include <random>
-
 class CopyTests : public BetaNNTests {
  public:
   template<typename T, typename I>
@@ -64,18 +62,6 @@ class CopyTests : public BetaNNTests {
     device_.Flush();
     return ReadFromBuffer<T>(dst, dstNumElements);
   }
-
-  template<typename T>
-  std::vector<T> RandomNumbers(size_t size) {
-    std::uniform_int_distribution<T> dist(0, 8964);
-    std::vector<T> ret;
-    for (size_t i = 0; i < size; ++i)
-      ret.push_back(dist(mt_));
-    return ret;
-  }
-
- private:
-  std::mt19937 mt_;
 };
 
 template<typename T>

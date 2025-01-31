@@ -96,6 +96,15 @@ void RandomBitsGeneral(Device& device,
                        const std::vector<uint32_t>& keysShape,
                        const std::vector<uint32_t>& keysStrides);
 
+void SortSingleBlockContiguous(Device& device,
+                               uint32_t axis,
+                               DataType dataType,
+                               const wgpu::Buffer& out,
+                               const std::vector<uint32_t>& outStrides,
+                               const wgpu::Buffer& input,
+                               const std::vector<uint32_t>& inputShape,
+                               const std::vector<uint32_t>& inputStrides);
+
 }  // namespace betann
 
 #endif  // BETANN_KERNELS_H_

@@ -1,3 +1,5 @@
+enable f16;
+
 alias output_dtype = $0;
 alias input_dtype = $1;
 

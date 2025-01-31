@@ -30,7 +30,8 @@ set(BETANN_WGSL_SOURCES betann/wgsl/binary_contiguous.wgsl
                         betann/wgsl/copy_general_both.wgsl
                         betann/wgsl/random_contiguous.wgsl
                         betann/wgsl/random_general.wgsl
-                        betann/wgsl/random_utils.wgsl)
+                        betann/wgsl/random_utils.wgsl
+                        betann/wgsl/sort_block_contiguous.wgsl)
 string(JOIN ":" BETANN_WGSL_SOURCES_ARG ${BETANN_WGSL_SOURCES})
 add_custom_command(
   OUTPUT gen/wgsl_sources.h
@@ -94,7 +95,8 @@ if (BETANN_BUILD_TESTS)
   FetchContent_MakeAvailable(googletest)
   add_executable(betann_tests tests/binary_tests.cc
                               tests/copy_tests.cc
-                              tests/random_tests.cc)
+                              tests/random_tests.cc
+                              tests/sort_tests.cc)
   target_link_libraries(betann_tests PRIVATE betann
                                              GTest::gtest_main)
 endif()

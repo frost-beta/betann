@@ -1,3 +1,5 @@
+enable f16;
+
 alias dst_dtype = $0;
 alias src_dtype = $1;
 

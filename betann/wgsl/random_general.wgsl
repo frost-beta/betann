@@ -3,7 +3,7 @@ override num_threads: u32 = 8;
 // WGSL does not have byte type so |out| is represented as an array of 4-bytes,
 // which requires the caller to align |out| to 4-bytes.
 @group(0) @binding(0) var<storage, read_write> out: array<u32>;
-@group(0) @binding(1) var<storage, read> bytes_per_key: u32;
+@group(0) @binding(1) var<uniform> bytes_per_key: u32;
 @group(0) @binding(2) var<storage, read> keys: array<u32>;
 @group(0) @binding(3) var<storage, read> keys_shape: array<u32>;
 @group(0) @binding(4) var<storage, read> keys_strides: array<u32>;

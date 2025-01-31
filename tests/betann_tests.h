@@ -1,4 +1,5 @@
 #include <cstring>
+#include <random>
 
 #include <betann/betann.h>
 #include <gtest/gtest.h>
@@ -18,5 +19,17 @@ class BetaNNTests : public testing::Test {
     return out;
   }
 
+  template<typename T>
+  std::vector<T> RandomNumbers(size_t size) {
+    std::uniform_int_distribution<T> dist(0, 8964);
+    std::vector<T> ret;
+    for (size_t i = 0; i < size; ++i)
+      ret.push_back(dist(mt_));
+    return ret;
+  }
+
   betann::Device device_;
+
+ private:
+  std::mt19937 mt_;
 };

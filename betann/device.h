@@ -4,6 +4,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <webgpu/webgpu_cpp.h>
@@ -31,6 +32,12 @@ class Device {
       const void* data,
       size_t size,
       wgpu::BufferUsage usage = wgpu::BufferUsage::Storage);
+  template<typename T, typename = std::enable_if_t<std::is_scalar_v<T>>>
+  wgpu::Buffer CreateBufferFromScalar(
+      T data,
+      wgpu::BufferUsage usage = wgpu::BufferUsage::Uniform) {
+    return CreateBufferFromData(&data, sizeof(T), usage);
+  }
   template<typename T>
   wgpu::Buffer CreateBufferFromVector(
       const std::vector<T>& vec,
