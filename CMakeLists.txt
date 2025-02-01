@@ -30,7 +30,7 @@ set(BETANN_WGSL_SOURCES betann/wgsl/binary_contiguous.wgsl
                         betann/wgsl/copy_general.wgsl
                         betann/wgsl/copy_general_both.wgsl
                         betann/wgsl/random.wgsl
-                        betann/wgsl/sort_block_contiguous.wgsl)
+                        betann/wgsl/sort_block.wgsl)
 string(JOIN ":" BETANN_WGSL_SOURCES_ARG ${BETANN_WGSL_SOURCES})
 add_custom_command(
   OUTPUT gen/wgsl_sources.h

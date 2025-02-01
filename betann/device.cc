@@ -220,15 +220,14 @@ const wgpu::ComputePipeline& Device::CreateKernel(
   return kernels_[std::move(key)] = std::move(kernel);
 }
 
-wgpu::BindGroup Device::CreateBindGroup(
-    const wgpu::ComputePipeline& kernel,
-    std::initializer_list<wgpu::Buffer> buffers) {
+wgpu::BindGroup Device::CreateBindGroup(const wgpu::ComputePipeline& kernel,
+                                        std::vector<wgpu::Buffer> buffers) {
   std::vector<wgpu::BindGroupEntry> entries;
   uint32_t index = 0;
-  for (const wgpu::Buffer& buffer : buffers) {
+  for (wgpu::Buffer& buffer : buffers) {
     wgpu::BindGroupEntry entry;
     entry.binding = index++;
-    entry.buffer = buffer;
+    entry.buffer = std::move(buffer);
     entries.push_back(std::move(entry));
   }
   wgpu::BindGroupDescriptor descriptor;

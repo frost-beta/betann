@@ -52,7 +52,7 @@ void RunKernel(Device& device,
                const std::string& kernelName,
                const std::string& shaderKey,
                F&& getSource,
-               std::initializer_list<wgpu::Buffer> buffers,
+               std::vector<wgpu::Buffer> buffers,
                Dims3 workgroupsCount) {
   const wgpu::ShaderModule& shader = device.CreateShaderModule(
       fmt::format("{}_{}", kernelName, shaderKey).c_str(),
@@ -311,54 +311,75 @@ void RandomBitsGeneral(Device& device,
             workgroupsCount);
 }
 
-void SortContiguous(Device& device,
-                    uint32_t axis,
-                    SortResultType resultType,
-                    DataType dataType,
-                    const wgpu::Buffer& out,
-                    const std::vector<uint32_t>& outStrides,
-                    const wgpu::Buffer& input,
-                    const std::vector<uint32_t>& inputShape,
-                    const std::vector<uint32_t>& inputStrides) {
-  const uint32_t workgroupSize = 256;
-  const uint32_t workPerThread = 8;  // TODO(zcbenz): make it dynamic
+uint32_t SortBlockSize() {
+  const uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
+  const uint32_t workPerThread = 8;
+  return  workgroupSize * workPerThread;
+}
+
+void SortBlock(Device& device,
+               uint32_t axis,
+               SortInputType inputType,
+               SortResultType resultType,
+               DataType dataType,
+               const wgpu::Buffer& out,
+               const std::vector<uint32_t>& outStrides,
+               const wgpu::Buffer& input,
+               const std::vector<uint32_t>& inputShape,
+               const std::vector<uint32_t>& inputStrides) {
   uint32_t sizeSortedAxis = inputShape[axis];
-  if (sizeSortedAxis > workgroupSize * workPerThread) {
+  if (sizeSortedAxis > SortBlockSize()) {
     throw std::runtime_error(
         fmt::format("Elements number of sorted axis ({}) exceeds limit ({}).",
-                    sizeSortedAxis, workgroupSize * workPerThread));
+                    sizeSortedAxis, SortBlockSize()));
   }
   auto removeAxis = [](const std::vector<uint32_t>& input, uint32_t axis) {
     auto ret = input;
     ret.erase(ret.begin() + axis);
     return ret;
   };
+  std::vector<wgpu::Buffer> buffers = {
+      out,
+      device.CreateBufferFromScalar(sizeSortedAxis),
+      device.CreateBufferFromScalar(outStrides[axis]),
+      input,
+      device.CreateBufferFromScalar(inputStrides[axis]),
+  };
   auto outRestStrides = removeAxis(outStrides, axis);
   auto inputRestStrides = removeAxis(inputStrides, axis);
+  bool contiguous = inputType == SortInputType::Contiguous;
+  if (contiguous) {
+    buffers.push_back(device.CreateBufferFromScalar(
+        *std::min_element(outRestStrides.begin(), outRestStrides.end())));
+    buffers.push_back(device.CreateBufferFromScalar(
+        *std::min_element(inputRestStrides.begin(), inputRestStrides.end())));
+  } else {
+    auto inputRestShape = removeAxis(inputShape, axis);
+    if (inputRestShape.empty()) {
+      wgpu::Buffer zero = device.CreateBufferFromScalar<uint32_t>(
+          0, wgpu::BufferUsage::Storage);
+      buffers.push_back(zero);
+      buffers.push_back(zero);
+      buffers.push_back(zero);
+    } else {
+      buffers.push_back(device.CreateBufferFromVector(outRestStrides));
+      buffers.push_back(device.CreateBufferFromVector(inputRestShape));
+      buffers.push_back(device.CreateBufferFromVector(inputRestStrides));
+    }
+  }
   bool argsort = resultType == SortResultType::Indices;
   RunKernel(device,
-            "sort_block_c",
-            fmt::format("{}_{}", WgslType(dataType), argsort),
+            "sort_block",
+            fmt::format("{}_{}_{}", WgslType(dataType), argsort, contiguous),
             [&]() {
-              return ParseTemplate(wgsl_source_sort_block_contiguous,
+              return ParseTemplate(wgsl_source_sort_block,
                                    {
                                      {"dtype", WgslType(dataType)},
                                      {"argsort", argsort},
+                                     {"contiguous", contiguous},
                                    });
             },
-            {
-              out,
-              device.CreateBufferFromScalar(sizeSortedAxis),
-              device.CreateBufferFromScalar(outStrides[axis]),
-              device.CreateBufferFromScalar(
-                  *std::min_element(outRestStrides.begin(),
-                                    outRestStrides.end())),
-              input,
-              device.CreateBufferFromScalar(inputStrides[axis]),
-              device.CreateBufferFromScalar(
-                  *std::min_element(inputRestStrides.begin(),
-                                    inputRestStrides.end())),
-            },
+            buffers,
             {1, NumElements(inputShape) / sizeSortedAxis, 1});
 }
 

@@ -12,10 +12,16 @@ if ($argsort) {
 }
 @group(0) @binding(1) var<uniform> size_sorted_axis: u32;
 @group(0) @binding(2) var<uniform> out_stride_sorted_axis: u32;
-@group(0) @binding(3) var<uniform> out_stride_segment_axis: u32;
-@group(0) @binding(4) var<storage, read> input: array<dtype>;
-@group(0) @binding(5) var<uniform> input_stride_sorted_axis: u32;
-@group(0) @binding(6) var<uniform> input_stride_segment_axis: u32;
+@group(0) @binding(3) var<storage, read> input: array<dtype>;
+@group(0) @binding(4) var<uniform> input_stride_sorted_axis: u32;
+if ($contiguous) {
+  @group(0) @binding(5) var<uniform> out_stride_segment_axis: u32;
+  @group(0) @binding(6) var<uniform> input_stride_segment_axis: u32;
+} else {
+  @group(0) @binding(5) var<storage> out_rest_strides: array<u32>;
+  @group(0) @binding(6) var<storage> input_rest_shape: array<u32>;
+  @group(0) @binding(7) var<storage> input_rest_strides: array<u32>;
+}
 
 var<workgroup> workgroup_vals: array<dtype, n_per_block>;
 if ($argsort) {
@@ -23,10 +29,24 @@ if ($argsort) {
 }
 
 @compute @workgroup_size(num_threads, 1, 1)
-fn sort_block_c(@builtin(workgroup_id) tid: vec3<u32>,
-                @builtin(local_invocation_id) lid: vec3<u32>) {
+fn sort_block(@builtin(workgroup_id) tid: vec3<u32>,
+              @builtin(local_invocation_id) lid: vec3<u32>) {
+  if ($contiguous) {
+    let out_offset = tid.y * out_stride_segment_axis;
+    let input_offset = tid.y * input_stride_segment_axis;
+  } else {
+    let ndim = arrayLength(&input_rest_shape);
+    var out_offset: u32 = 0;
+    var input_offset: u32 = 0;
+    var elem = tid.y;
+    for (var i = ndim - 1; i >= 0 && elem > 0; i--) {
+      out_offset += (elem % input_rest_shape[i]) * out_rest_strides[i];
+      input_offset += (elem % input_rest_shape[i]) * input_rest_strides[i];
+      elem /= input_rest_shape[i];
+    }
+  }
+
   // Copy into workgroup memory.
-  let input_offset = tid.y * input_stride_segment_axis;
   for (var i = lid.x; i < n_per_block; i += num_threads) {
     workgroup_vals[i] = select(dtype_max_value(),
                                input[input_offset + i * input_stride_sorted_axis],
@@ -42,7 +62,6 @@ fn sort_block_c(@builtin(workgroup_id) tid: vec3<u32>,
   workgroupBarrier();
 
   // Write output.
-  let out_offset = tid.y * out_stride_segment_axis;
   for (var i = lid.x; i < size_sorted_axis; i += num_threads) {
     let out_idx = out_offset + i * out_stride_sorted_axis;
     if ($argsort) {

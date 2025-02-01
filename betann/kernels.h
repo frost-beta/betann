@@ -96,6 +96,17 @@ void RandomBitsGeneral(Device& device,
                        const std::vector<uint32_t>& keysShape,
                        const std::vector<uint32_t>& keysStrides);
 
+// Maximum number of elements can sort in one block.
+uint32_t SortBlockSize();
+
+enum class SortInputType {
+  // The input is contiguous and the sorted axis has either largest or smallest
+  // stride.
+  Contiguous,
+  // The input is virtual.
+  General,
+};
+
 enum class SortResultType {
   // Return sorted values.
   Values,
@@ -103,15 +114,17 @@ enum class SortResultType {
   Indices,
 };
 
-void SortContiguous(Device& device,
-                    uint32_t axis,
-                    SortResultType resultType,
-                    DataType dataType,
-                    const wgpu::Buffer& out,
-                    const std::vector<uint32_t>& outStrides,
-                    const wgpu::Buffer& input,
-                    const std::vector<uint32_t>& inputShape,
-                    const std::vector<uint32_t>& inputStrides);
+// Sort input assuming elements in axis can fit in one block.
+void SortBlock(Device& device,
+               uint32_t axis,
+               SortInputType inputType,
+               SortResultType resultType,
+               DataType dataType,
+               const wgpu::Buffer& out,
+               const std::vector<uint32_t>& outStrides,
+               const wgpu::Buffer& input,
+               const std::vector<uint32_t>& inputShape,
+               const std::vector<uint32_t>& inputStrides);
 
 }  // namespace betann
 

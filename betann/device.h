@@ -57,7 +57,7 @@ class Device {
   const wgpu::ComputePipeline& CreateKernel(const wgpu::ShaderModule& shader,
                                             const char* entryPoint);
   wgpu::BindGroup CreateBindGroup(const wgpu::ComputePipeline& kernel,
-                                  std::initializer_list<wgpu::Buffer> buffers);
+                                  std::vector<wgpu::Buffer> buffers);
   void RunKernel(const wgpu::ComputePipeline& kernel,
                  const wgpu::BindGroup& bindGroup,
                  Dims3 workgroupsCount);
