@@ -45,14 +45,23 @@ Device::Device() {
     throw std::runtime_error("GetInfo failed.");
   if (info.backendType == wgpu::BackendType::Null)
     throw std::runtime_error("There is no valid backend.");
+  supportsF16_ = adapter_.HasFeature(wgpu::FeatureName::ShaderF16);
 
-  // Synchronously request the device.
+  // Set limits for device.
   wgpu::RequiredLimits requiredLimits;
   requiredLimits.limits.maxComputeInvocationsPerWorkgroup =
-      512;  // used by 3d binary general kernel
+      512;  // used by general kernels
   wgpu::DeviceDescriptor deviceDescriptor;
   deviceDescriptor.label = "BetaNN Device";
   deviceDescriptor.requiredLimits = &requiredLimits;
+  std::vector<wgpu::FeatureName> requiredFeatures;
+  if (supportsF16_) {
+    requiredFeatures.push_back(wgpu::FeatureName::ShaderF16);
+  }
+  deviceDescriptor.requiredFeatures = requiredFeatures.data();
+  deviceDescriptor.requiredFeatureCount = requiredFeatures.size();
+
+  // Synchronously request the device.
   deviceDescriptor.SetDeviceLostCallback(
       wgpu::CallbackMode::AllowSpontaneous,
       [](const wgpu::Device& device,

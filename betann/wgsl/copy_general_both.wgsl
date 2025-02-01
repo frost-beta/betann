@@ -1,3 +1,7 @@
+if ($enable_f16) {
+  enable f16;
+}
+
 alias dst_dtype = $dst_dtype;
 alias src_dtype = $src_dtype;
 

@@ -104,6 +104,7 @@ void BinaryOpContiguous(Device& device,
               return Append(ParseTemplate(
                                 wgsl_source_binary_contiguous,
                                 {
+                                  {"enable_f16", device.SupportsF16()},
                                   {"output_dtype", WgslType(outputDataType)},
                                   {"input_dtype", WgslType(inputDataType)},
                                   {"op", name},
@@ -139,6 +140,7 @@ void BinaryOpGeneral(Device& device,
               return Append(ParseTemplate(
                                 wgsl_source_binary_general,
                                 {
+                                  {"enable_f16", device.SupportsF16()},
                                   {"output_dtype", WgslType(outputDataType)},
                                   {"input_dtype", WgslType(inputDataType)},
                                   {"op", name},
@@ -182,6 +184,7 @@ void CopyContiguous(Device& device,
             [&]() {
               return ParseTemplate(wgsl_source_copy_contiguous,
                                    {
+                                     {"enable_f16", device.SupportsF16()},
                                      {"dst_dtype", WgslType(dstDataType)},
                                      {"src_dtype", WgslType(srcDataType)},
                                    });
@@ -209,6 +212,7 @@ void CopyGeneral(Device& device,
             [&]() {
               return ParseTemplate(wgsl_source_copy_general,
                                    {
+                                     {"enable_f16", device.SupportsF16()},
                                      {"dst_dtype", WgslType(dstDataType)},
                                      {"src_dtype", WgslType(srcDataType)},
                                    });
@@ -240,6 +244,7 @@ void CopyGeneralBoth(Device& device,
             [&]() {
               return ParseTemplate(wgsl_source_copy_general_both,
                                    {
+                                     {"enable_f16", device.SupportsF16()},
                                      {"dst_dtype", WgslType(dstDataType)},
                                      {"src_dtype", WgslType(srcDataType)},
                                    });
@@ -269,7 +274,7 @@ void RandomBitsContiguous(Device& device,
   workgroupsCount.y = DivCeil(outPerKey / 2 + (outPerKey % 2), workgroupSize);
   RunKernel(device,
             "rbits",
-            fmt::format("{}", true),
+            "contiguous",
             [&]() {
               return ParseTemplate(wgsl_source_random, {{"contiguous", true}});
             },
@@ -297,7 +302,7 @@ void RandomBitsGeneral(Device& device,
   workgroupsCount.y = DivCeil(outPerKey / 2 + (outPerKey % 2), workgroupSize);
   RunKernel(device,
             "rbits",
-            fmt::format("{}", false),
+            "general",
             [&]() {
               return ParseTemplate(wgsl_source_random, {{"contiguous", false}});
             },
@@ -374,6 +379,7 @@ void SortBlock(Device& device,
             [&]() {
               return ParseTemplate(wgsl_source_sort_block,
                                    {
+                                     {"enable_f16", device.SupportsF16()},
                                      {"dtype", WgslType(dataType)},
                                      {"argsort", argsort},
                                      {"contiguous", contiguous},

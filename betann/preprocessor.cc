@@ -7,7 +7,7 @@ namespace betann {
 namespace {
 
 size_t FindEndOfVar(std::string_view templ, size_t pos) {
-  return templ.find_first_not_of("abcdefghijklmnopqrstuvwxyz_", pos);
+  return templ.find_first_not_of("0123456789abcdefghijklmnopqrstuvwxyz_", pos);
 }
 
 VariablesMap::mapped_type GetVar(const VariablesMap& variables,

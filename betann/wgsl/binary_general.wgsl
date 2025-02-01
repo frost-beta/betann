@@ -1,3 +1,7 @@
+if ($enable_f16) {
+  enable f16;
+}
+
 alias output_dtype = $output_dtype;
 alias input_dtype = $input_dtype;
 

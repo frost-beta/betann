@@ -63,6 +63,7 @@ class Device {
                  Dims3 workgroupsCount);
 
   const wgpu::Limits& GetLimits() const { return limits_; }
+  bool SupportsF16() const { return supportsF16_; }
 
  private:
   void EnsureEncoder();
@@ -76,6 +77,7 @@ class Device {
   wgpu::Device device_;
   wgpu::Queue queue_;
   wgpu::Limits limits_;
+  bool supportsF16_ = false;
 
   std::map<std::string, wgpu::ShaderModule> modules_;
   std::map<std::pair<WGPUShaderModule, std::string>,

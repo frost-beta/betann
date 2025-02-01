@@ -1,3 +1,7 @@
+if ($enable_f16) {
+  enable f16;
+}
+
 alias dtype = $dtype;
 
 const num_threads: u32 = 256;
@@ -204,6 +208,9 @@ fn compare_op(a: dtype, b: dtype) -> bool {
 const max_i32 = 0x7fffffffi;
 const max_u32 = 0xffffffffu;
 const max_f32 = 0x1.fffffep+127f;
+if ($enable_f16) {
+  const max_f16 = 0x1.ffcp+15h;
+}
 
 fn dtype_max_value() -> dtype {
   return max_$dtype;
