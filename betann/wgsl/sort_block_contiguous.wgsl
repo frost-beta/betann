@@ -8,14 +8,16 @@ const work_per_thread: u32 = 8;
 const n_per_block = num_threads * work_per_thread;
 
 @group(0) @binding(0) var<storage, read_write> out: array<dtype>;
-@group(0) @binding(1) var<uniform> size_sorted_axis: u32;
-@group(0) @binding(2) var<uniform> out_stride_sorted_axis: u32;
-@group(0) @binding(3) var<uniform> out_stride_segment_axis: u32;
-@group(0) @binding(4) var<storage, read> input: array<dtype>;
-@group(0) @binding(5) var<uniform> input_stride_sorted_axis: u32;
-@group(0) @binding(6) var<uniform> input_stride_segment_axis: u32;
+@group(0) @binding(1) var<storage, read_write> indices: array<u32>;
+@group(0) @binding(2) var<uniform> size_sorted_axis: u32;
+@group(0) @binding(3) var<uniform> out_stride_sorted_axis: u32;
+@group(0) @binding(4) var<uniform> out_stride_segment_axis: u32;
+@group(0) @binding(5) var<storage, read> input: array<dtype>;
+@group(0) @binding(6) var<uniform> input_stride_sorted_axis: u32;
+@group(0) @binding(7) var<uniform> input_stride_segment_axis: u32;
 
 var<workgroup> workgroup_vals: array<dtype, n_per_block>;
+var<workgroup> workgroup_idxs: array<u32, n_per_block>;
 
 @compute @workgroup_size(num_threads, 1, 1)
 fn sort_block_c(@builtin(workgroup_id) tid: vec3<u32>,
@@ -26,6 +28,7 @@ fn sort_block_c(@builtin(workgroup_id) tid: vec3<u32>,
     workgroup_vals[i] = select(dtype_max_value(),
                                input[input_offset + i * input_stride_sorted_axis],
                                i < size_sorted_axis);
+    workgroup_idxs[i] = i;
   }
 
   // Sort elements in workgroup.
@@ -36,16 +39,20 @@ fn sort_block_c(@builtin(workgroup_id) tid: vec3<u32>,
   // Write output.
   let out_offset = tid.y * out_stride_segment_axis;
   for (var i = lid.x; i < size_sorted_axis; i += num_threads) {
-    out[out_offset + i * out_stride_sorted_axis] = workgroup_vals[i];
+    let out_idx = out_offset + i * out_stride_sorted_axis;
+    out[out_idx] = workgroup_vals[i];
+    indices[out_idx] = workgroup_idxs[i];
   }
 }
 
 fn sort_in_workgroup(size_sorted_axis: u32, lid: vec3<u32>) {
   // Load from shared memory.
   var vals: array<dtype, work_per_thread>;
+  var idxs: array<u32, work_per_thread>;
   let idx = lid.x * work_per_thread;
   for (var i: u32 = 0; i < work_per_thread; i++) {
     vals[i] = workgroup_vals[idx + i];
+    idxs[i] = workgroup_idxs[idx + i];
   }
 
   // Per-thread odd-even sort.
@@ -53,9 +60,12 @@ fn sort_in_workgroup(size_sorted_axis: u32, lid: vec3<u32>) {
     for (var i: u32 = 0; i < work_per_thread; i++) {
       for (var j: u32 = i & 1; j < work_per_thread; j += 2) {
         if (compare_op(vals[j + 1], vals[j])) {
-          let tmp = vals[j];
+          let tmp1 = vals[j];
           vals[j] = vals[j + 1];
-          vals[j + 1] = tmp;
+          vals[j + 1] = tmp1;
+          let tmp2 = idxs[j];
+          idxs[j] = idxs[j + 1];
+          idxs[j + 1] = tmp2;
         }
       }
     }
@@ -69,6 +79,7 @@ fn sort_in_workgroup(size_sorted_axis: u32, lid: vec3<u32>) {
     workgroupBarrier();
     for (var i: u32 = 0; i < work_per_thread; i++) {
       workgroup_vals[idx + i] = vals[i];
+      workgroup_idxs[idx + i] = idxs[i];
     }
     workgroupBarrier();
 
@@ -97,13 +108,14 @@ fn sort_in_workgroup(size_sorted_axis: u32, lid: vec3<u32>) {
     b_size -= sort_median - part;
 
     // Merge starting at the partition and store results in thread registers.
-    merge_step(a_start, a_size, b_start, b_size, &vals);
+    merge_step(a_start, a_size, b_start, b_size, &vals, &idxs);
   }
 
-  // Write out.
+  // Write out to shared memory.
   workgroupBarrier();
   for (var i: u32 = 0; i < work_per_thread; i++) {
     workgroup_vals[idx + i] = vals[i];
+    workgroup_idxs[idx + i] = idxs[i];
   }
 }
 
@@ -130,7 +142,8 @@ fn merge_partition(a_offset: u32, a_size: u32,
 
 fn merge_step(a_offset: u32, a_size: u32,
               b_offset: u32, b_size: u32,
-              vals: ptr<function, array<dtype, work_per_thread>>) {
+              vals: ptr<function, array<dtype, work_per_thread>>,
+              idxs: ptr<function, array<u32, work_per_thread>>) {
   var a_idx: u32 = 0;
   var b_idx: u32 = 0;
 
@@ -140,6 +153,7 @@ fn merge_step(a_offset: u32, a_size: u32,
     let pred = (b_idx < b_size) && (a_idx >= a_size || compare_op(b, a));
 
     vals[i] = select(a, b, pred);
+    idxs[i] = select(workgroup_idxs[a_idx], workgroup_idxs[b_idx], pred);
 
     a_idx += u32(!pred);
     b_idx += u32(pred);
