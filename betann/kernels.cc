@@ -50,12 +50,12 @@ Dims3 GetWorkgroupsCountGeneral(const std::vector<uint32_t>& shape,
 template<typename F>
 void RunKernel(Device& device,
                const std::string& kernelName,
-               const std::string& shaderSuffix,
+               const std::string& shaderKey,
                F&& getSource,
                std::initializer_list<wgpu::Buffer> buffers,
                Dims3 workgroupsCount) {
   const wgpu::ShaderModule& shader = device.CreateShaderModule(
-      fmt::format("{}_{}", kernelName, shaderSuffix).c_str(),
+      fmt::format("{}_{}", kernelName, shaderKey).c_str(),
       std::forward<F>(getSource));
   const wgpu::ComputePipeline& kernel = device.CreateKernel(
       shader,
@@ -268,11 +268,10 @@ void RandomBitsContiguous(Device& device,
   workgroupsCount.x = DivCeil(numKeys, workgroupSize);
   workgroupsCount.y = DivCeil(outPerKey / 2 + (outPerKey % 2), workgroupSize);
   RunKernel(device,
-            "rbits_c",
-            "",
+            "rbits",
+            fmt::format("{}", true),
             [&]() {
-              return Append(wgsl_source_random_contiguous,
-                            wgsl_source_random_utils);
+              return ParseTemplate(wgsl_source_random, {{"contiguous", true}});
             },
             {
               out,
@@ -298,10 +297,9 @@ void RandomBitsGeneral(Device& device,
   workgroupsCount.y = DivCeil(outPerKey / 2 + (outPerKey % 2), workgroupSize);
   RunKernel(device,
             "rbits",
-            "",
+            fmt::format("{}", false),
             [&]() {
-              return Append(wgsl_source_random_general,
-                            wgsl_source_random_utils);
+              return ParseTemplate(wgsl_source_random, {{"contiguous", false}});
             },
             {
               out,

@@ -20,16 +20,27 @@ VariablesMap::mapped_type GetVar(const VariablesMap& variables,
   return var->second;
 }
 
-std::tuple<size_t, size_t, std::string_view> GetBraceBody(
-    std::string_view templ, size_t pos) {
-  size_t start = templ.find("{", pos);
-  if (start == std::string::npos)
+std::tuple<size_t, size_t, std::string_view> GetBraceBody(std::string_view text,
+                                                          size_t pos) {
+  size_t braces = 0;
+  size_t start = 0;
+  for (size_t i = pos; i < text.size(); ++i) {
+    if (text[i] == '{') {
+      if (start == 0)
+        start = i + 1;
+      braces++;
+    } else if (text[i] == '}') {
+      if (braces == 0)
+        throw std::runtime_error("Too many } found.");
+      braces--;
+      if (braces == 0)
+        return {start + 1, i, text.substr(start, i - start)};
+    }
+  }
+  if (braces == 0)
     throw std::runtime_error("Can not find { after if statement.");
-  size_t end = templ.find("}", start);
-  if (end == std::string::npos)
+  else
     throw std::runtime_error("Can not find matching } for if statement.");
-  start += 1;
-  return {start, end, templ.substr(start, end - start)};
 }
 
 std::string KeepOnlyNewLines(std::string_view text) {
