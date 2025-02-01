@@ -50,16 +50,9 @@ Device::Device() {
   wgpu::RequiredLimits requiredLimits;
   requiredLimits.limits.maxComputeInvocationsPerWorkgroup =
       512;  // used by 3d binary general kernel
-  std::vector<wgpu::FeatureName> requiredFeatures = {
-      wgpu::FeatureName::ShaderF16,
-      wgpu::FeatureName::Subgroups,
-      wgpu::FeatureName::SubgroupsF16,
-  };
   wgpu::DeviceDescriptor deviceDescriptor;
   deviceDescriptor.label = "BetaNN Device";
   deviceDescriptor.requiredLimits = &requiredLimits;
-  deviceDescriptor.requiredFeatures = requiredFeatures.data();
-  deviceDescriptor.requiredFeatureCount = requiredFeatures.size();
   deviceDescriptor.SetDeviceLostCallback(
       wgpu::CallbackMode::AllowSpontaneous,
       [](const wgpu::Device& device,
