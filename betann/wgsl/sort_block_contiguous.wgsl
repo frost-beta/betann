@@ -1,21 +1,26 @@
-alias dtype = $0;
+alias dtype = $dtype;
 
 const num_threads: u32 = 256;
 const work_per_thread: u32 = 8;
 
 const n_per_block = num_threads * work_per_thread;
 
-@group(0) @binding(0) var<storage, read_write> out: array<dtype>;
-@group(0) @binding(1) var<storage, read_write> indices: array<u32>;
-@group(0) @binding(2) var<uniform> size_sorted_axis: u32;
-@group(0) @binding(3) var<uniform> out_stride_sorted_axis: u32;
-@group(0) @binding(4) var<uniform> out_stride_segment_axis: u32;
-@group(0) @binding(5) var<storage, read> input: array<dtype>;
-@group(0) @binding(6) var<uniform> input_stride_sorted_axis: u32;
-@group(0) @binding(7) var<uniform> input_stride_segment_axis: u32;
+if ($argsort) {
+  @group(0) @binding(0) var<storage, read_write> indices: array<u32>;
+} else {
+  @group(0) @binding(0) var<storage, read_write> out: array<dtype>;
+}
+@group(0) @binding(1) var<uniform> size_sorted_axis: u32;
+@group(0) @binding(2) var<uniform> out_stride_sorted_axis: u32;
+@group(0) @binding(3) var<uniform> out_stride_segment_axis: u32;
+@group(0) @binding(4) var<storage, read> input: array<dtype>;
+@group(0) @binding(5) var<uniform> input_stride_sorted_axis: u32;
+@group(0) @binding(6) var<uniform> input_stride_segment_axis: u32;
 
 var<workgroup> workgroup_vals: array<dtype, n_per_block>;
-var<workgroup> workgroup_idxs: array<u32, n_per_block>;
+if ($argsort) {
+  var<workgroup> workgroup_idxs: array<u32, n_per_block>;
+}
 
 @compute @workgroup_size(num_threads, 1, 1)
 fn sort_block_c(@builtin(workgroup_id) tid: vec3<u32>,
@@ -26,7 +31,9 @@ fn sort_block_c(@builtin(workgroup_id) tid: vec3<u32>,
     workgroup_vals[i] = select(dtype_max_value(),
                                input[input_offset + i * input_stride_sorted_axis],
                                i < size_sorted_axis);
-    workgroup_idxs[i] = i;
+    if ($argsort) {
+      workgroup_idxs[i] = i;
+    }
   }
 
   // Sort elements in workgroup.
@@ -38,8 +45,11 @@ fn sort_block_c(@builtin(workgroup_id) tid: vec3<u32>,
   let out_offset = tid.y * out_stride_segment_axis;
   for (var i = lid.x; i < size_sorted_axis; i += num_threads) {
     let out_idx = out_offset + i * out_stride_sorted_axis;
-    out[out_idx] = workgroup_vals[i];
-    indices[out_idx] = workgroup_idxs[i];
+    if ($argsort) {
+      indices[out_idx] = workgroup_idxs[i];
+    } else {
+      out[out_idx] = workgroup_vals[i];
+    }
   }
 }
 
@@ -50,7 +60,9 @@ fn sort_in_workgroup(size_sorted_axis: u32, lid: vec3<u32>) {
   let idx = lid.x * work_per_thread;
   for (var i: u32 = 0; i < work_per_thread; i++) {
     vals[i] = workgroup_vals[idx + i];
-    idxs[i] = workgroup_idxs[idx + i];
+    if ($argsort) {
+      idxs[i] = workgroup_idxs[idx + i];
+    }
   }
 
   // Per-thread odd-even sort.
@@ -61,9 +73,11 @@ fn sort_in_workgroup(size_sorted_axis: u32, lid: vec3<u32>) {
           let tmp1 = vals[j];
           vals[j] = vals[j + 1];
           vals[j + 1] = tmp1;
-          let tmp2 = idxs[j];
-          idxs[j] = idxs[j + 1];
-          idxs[j + 1] = tmp2;
+          if ($argsort) {
+            let tmp2 = idxs[j];
+            idxs[j] = idxs[j + 1];
+            idxs[j + 1] = tmp2;
+          }
         }
       }
     }
@@ -77,7 +91,9 @@ fn sort_in_workgroup(size_sorted_axis: u32, lid: vec3<u32>) {
     workgroupBarrier();
     for (var i: u32 = 0; i < work_per_thread; i++) {
       workgroup_vals[idx + i] = vals[i];
-      workgroup_idxs[idx + i] = idxs[i];
+      if ($argsort) {
+        workgroup_idxs[idx + i] = idxs[i];
+      }
     }
     workgroupBarrier();
 
@@ -113,7 +129,9 @@ fn sort_in_workgroup(size_sorted_axis: u32, lid: vec3<u32>) {
   workgroupBarrier();
   for (var i: u32 = 0; i < work_per_thread; i++) {
     workgroup_vals[idx + i] = vals[i];
-    workgroup_idxs[idx + i] = idxs[i];
+    if ($argsort) {
+      workgroup_idxs[idx + i] = idxs[i];
+    }
   }
 }
 
@@ -151,7 +169,9 @@ fn merge_step(a_offset: u32, a_size: u32,
     let pred = (b_idx < b_size) && (a_idx >= a_size || compare_op(b, a));
 
     vals[i] = select(a, b, pred);
-    idxs[i] = select(workgroup_idxs[a_idx], workgroup_idxs[b_idx], pred);
+    if ($argsort) {
+      idxs[i] = select(workgroup_idxs[a_idx], workgroup_idxs[b_idx], pred);
+    }
 
     a_idx += u32(!pred);
     b_idx += u32(pred);
@@ -162,10 +182,10 @@ fn compare_op(a: dtype, b: dtype) -> bool {
   return a < b;
 }
 
-const i32_max = 0x7fffffffi;
-const u32_max = 0xffffffffu;
-const f32_max = 0x1.fffffep+127f;
+const max_i32 = 0x7fffffffi;
+const max_u32 = 0xffffffffu;
+const max_f32 = 0x1.fffffep+127f;
 
 fn dtype_max_value() -> dtype {
-  return $0_max;
+  return max_$dtype;
 }

@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(betann STATIC)
 target_sources(betann PRIVATE betann/device.cc
                               betann/kernels.cc
+                              betann/preprocessor.cc
                       PUBLIC FILE_SET HEADERS
                              BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
                              FILES betann/betann.h
@@ -74,8 +75,7 @@ set(TINT_BUILD_CMD_TOOLS OFF)
 set(TINT_BUILD_TESTS OFF)
 FetchContent_MakeAvailable(dawn)
 target_link_libraries(betann PUBLIC $<BUILD_INTERFACE:dawncpp_headers>
-                             PRIVATE $<LINK_ONLY:absl::strings>
-                                     $<LINK_ONLY:dawn::dawn_common>
+                             PRIVATE $<LINK_ONLY:dawn::dawn_common>
                                      $<LINK_ONLY:dawn::dawn_native>)
 
 # Build the procs that call dawn_native directly.

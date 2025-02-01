@@ -1,5 +1,5 @@
-alias dst_dtype = $0;
-alias src_dtype = $1;
+alias dst_dtype = $dst_dtype;
+alias src_dtype = $src_dtype;
 
 override num_threads: u32 = 256;
 

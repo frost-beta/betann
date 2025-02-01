@@ -1,19 +1,14 @@
 #include "betann/kernels.h"
 
-#include <absl/strings/substitute.h>
 #include <fmt/format.h>
 
+#include "betann/preprocessor.h"
 #include "betann/utils.h"
 #include "wgsl_sources.h"
 
 namespace betann {
 
 namespace {
-
-template<typename... Args>
-inline std::string GetShaderSource(Args&&... args) {
-  return absl::Substitute(std::forward<Args>(args)...);
-}
 
 template<typename... Args>
 inline std::string Append(std::string prefix, Args&&... args) {
@@ -106,10 +101,13 @@ void BinaryOpContiguous(Device& device,
                         WgslType(outputDataType),
                         WgslType(inputDataType)),
             [&]() {
-              return Append(GetShaderSource(wgsl_source_binary_contiguous,
-                                            WgslType(outputDataType),
-                                            WgslType(inputDataType),
-                                            name),
+              return Append(ParseTemplate(
+                                wgsl_source_binary_contiguous,
+                                {
+                                  {"output_dtype", WgslType(outputDataType)},
+                                  {"input_dtype", WgslType(inputDataType)},
+                                  {"op", name},
+                                }),
                             wgsl_source_binary_ops);
             },
             {output, a, b},
@@ -138,10 +136,13 @@ void BinaryOpGeneral(Device& device,
                         WgslType(outputDataType),
                         WgslType(inputDataType)),
             [&]() {
-              return Append(GetShaderSource(wgsl_source_binary_general,
-                                            WgslType(outputDataType),
-                                            WgslType(inputDataType),
-                                            name),
+              return Append(ParseTemplate(
+                                wgsl_source_binary_general,
+                                {
+                                  {"output_dtype", WgslType(outputDataType)},
+                                  {"input_dtype", WgslType(inputDataType)},
+                                  {"op", name},
+                                }),
                             wgsl_source_binary_ops);
             },
             {
@@ -179,9 +180,11 @@ void CopyContiguous(Device& device,
             fmt::format("copy_{}", typeStr),
             fmt::format("{}_{}", WgslType(dstDataType), WgslType(srcDataType)),
             [&]() {
-              return GetShaderSource(wgsl_source_copy_contiguous,
-                                     WgslType(dstDataType),
-                                     WgslType(srcDataType));
+              return ParseTemplate(wgsl_source_copy_contiguous,
+                                   {
+                                     {"dst_dtype", WgslType(dstDataType)},
+                                     {"src_dtype", WgslType(srcDataType)},
+                                   });
             },
             {dst, src},
             GetWorkgroupsCountContiguous(dstNumElements,
@@ -204,9 +207,11 @@ void CopyGeneral(Device& device,
                 : fmt::format("copy_g{}", srcShape.size()),
             fmt::format("{}_{}", WgslType(dstDataType), WgslType(srcDataType)),
             [&]() {
-              return GetShaderSource(wgsl_source_copy_general,
-                                     WgslType(dstDataType),
-                                     WgslType(srcDataType));
+              return ParseTemplate(wgsl_source_copy_general,
+                                   {
+                                     {"dst_dtype", WgslType(dstDataType)},
+                                     {"src_dtype", WgslType(srcDataType)},
+                                   });
             },
             {
               dst,
@@ -233,9 +238,11 @@ void CopyGeneralBoth(Device& device,
                 : fmt::format("copy_gg{}", srcShape.size()),
             fmt::format("{}_{}", WgslType(dstDataType), WgslType(srcDataType)),
             [&]() {
-              return GetShaderSource(wgsl_source_copy_general_both,
-                                     WgslType(dstDataType),
-                                     WgslType(srcDataType));
+              return ParseTemplate(wgsl_source_copy_general_both,
+                                   {
+                                     {"dst_dtype", WgslType(dstDataType)},
+                                     {"src_dtype", WgslType(srcDataType)},
+                                   });
             },
             {
               dst,
@@ -264,7 +271,7 @@ void RandomBitsContiguous(Device& device,
             "rbits_c",
             "",
             [&]() {
-              return Append(GetShaderSource(wgsl_source_random_contiguous),
+              return Append(wgsl_source_random_contiguous,
                             wgsl_source_random_utils);
             },
             {
@@ -293,7 +300,7 @@ void RandomBitsGeneral(Device& device,
             "rbits",
             "",
             [&]() {
-              return Append(GetShaderSource(wgsl_source_random_general),
+              return Append(wgsl_source_random_general,
                             wgsl_source_random_utils);
             },
             {
@@ -306,15 +313,15 @@ void RandomBitsGeneral(Device& device,
             workgroupsCount);
 }
 
-void SortSingleBlockContiguous(Device& device,
-                               uint32_t axis,
-                               DataType dataType,
-                               const wgpu::Buffer& out,
-                               const wgpu::Buffer& sortedIndices,
-                               const std::vector<uint32_t>& outStrides,
-                               const wgpu::Buffer& input,
-                               const std::vector<uint32_t>& inputShape,
-                               const std::vector<uint32_t>& inputStrides) {
+void SortContiguous(Device& device,
+                    uint32_t axis,
+                    SortResultType resultType,
+                    DataType dataType,
+                    const wgpu::Buffer& out,
+                    const std::vector<uint32_t>& outStrides,
+                    const wgpu::Buffer& input,
+                    const std::vector<uint32_t>& inputShape,
+                    const std::vector<uint32_t>& inputStrides) {
   const uint32_t workgroupSize = 256;
   const uint32_t workPerThread = 8;  // TODO(zcbenz): make it dynamic
   uint32_t sizeSortedAxis = inputShape[axis];
@@ -330,16 +337,19 @@ void SortSingleBlockContiguous(Device& device,
   };
   auto outRestStrides = removeAxis(outStrides, axis);
   auto inputRestStrides = removeAxis(inputStrides, axis);
+  bool argsort = resultType == SortResultType::Indices;
   RunKernel(device,
             "sort_block_c",
-            WgslType(dataType),
+            fmt::format("{}_{}", WgslType(dataType), argsort),
             [&]() {
-              return GetShaderSource(wgsl_source_sort_block_contiguous,
-                                     WgslType(dataType));
+              return ParseTemplate(wgsl_source_sort_block_contiguous,
+                                   {
+                                     {"dtype", WgslType(dataType)},
+                                     {"argsort", argsort},
+                                   });
             },
             {
               out,
-              sortedIndices,
               device.CreateBufferFromScalar(sizeSortedAxis),
               device.CreateBufferFromScalar(outStrides[axis]),
               device.CreateBufferFromScalar(
