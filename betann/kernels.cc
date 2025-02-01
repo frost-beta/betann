@@ -24,7 +24,7 @@ Dims3 GetWorkgroupsCountContiguous(uint32_t numElements,
     workgroupsCount.x = DivFloor(threadsPerDim, workgroupSize);
     workgroupsCount.y = DivCeil(numElements, workgroupsCount.x);
   } else {
-    workgroupsCount.y = DivCeil(numElements, workgroupSize);
+    workgroupsCount.x = DivCeil(numElements, workgroupSize);
   }
   return workgroupsCount;
 }
@@ -76,7 +76,7 @@ void BinaryOpContiguous(Device& device,
                         DataType inputDataType,
                         const wgpu::Buffer& a,
                         const wgpu::Buffer& b) {
-  const uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
+  const uint32_t workgroupSize = 64;  // TODO(zcbenz): make it dynamic
   uint32_t maxThreadsPerGridDim =
       device.GetLimits().maxComputeWorkgroupsPerDimension * workgroupSize;
   bool use2DGrid = outputNumElements > maxThreadsPerGridDim;
@@ -165,7 +165,7 @@ void CopyContiguous(Device& device,
                     uint32_t dstNumElements,
                     DataType srcDataType,
                     const wgpu::Buffer& src) {
-  const uint32_t workgroupSize = 256;  // TODO(zcbenz): make it dynamic
+  const uint32_t workgroupSize = 64;  // TODO(zcbenz): make it dynamic
   uint32_t maxThreadsPerGridDim =
       device.GetLimits().maxComputeWorkgroupsPerDimension * workgroupSize;
   bool use2DGrid = dstNumElements > maxThreadsPerGridDim;

@@ -91,7 +91,7 @@ TEST_F(CopyTests, SmallArrays) {
 
 TEST_F(CopyTests, LargeArrays) {
   uint32_t numElements =
-      device_.GetLimits().maxComputeWorkgroupsPerDimension * 256 + 100;
+      device_.GetLimits().maxComputeWorkgroupsPerDimension * 64 + 100;
   auto src = RandomNumbers<int32_t>(numElements);
   auto dst = RunCopyContiguous<int32_t>(betann::CopyType::Vector,
                                         numElements,

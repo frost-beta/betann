@@ -5,7 +5,7 @@ if ($enable_f16) {
 alias output_dtype = $output_dtype;
 alias input_dtype = $input_dtype;
 
-override num_threads: u32 = 256;
+override num_threads: u32 = 64;
 
 @group(0) @binding(0) var<storage, read_write> c: array<output_dtype>;
 @group(0) @binding(1) var<storage, read> a: array<input_dtype>;
