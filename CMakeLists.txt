@@ -12,18 +12,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(betann STATIC)
 target_sources(betann PRIVATE betann/device.cc
                               betann/kernels.cc
+                              betann/math.cc
                               betann/preprocessor.cc
                       PUBLIC FILE_SET HEADERS
                              BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
                              FILES betann/betann.h
                                    betann/device.h
-                                   betann/kernels.h)
+                                   betann/math.h
+                                   betann/kernels.h
+                                   betann/utils.h)
 target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
                                          $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
                                   PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/gen")
 
 # Embed WGSL sources in binary.
-set(BETANN_WGSL_SOURCES betann/wgsl/binary_contiguous.wgsl
+set(BETANN_WGSL_SOURCES betann/wgsl/arange.wgsl
+                        betann/wgsl/binary_contiguous.wgsl
                         betann/wgsl/binary_general.wgsl
                         betann/wgsl/binary_ops.wgsl
                         betann/wgsl/copy_contiguous.wgsl
@@ -91,7 +95,8 @@ if (BETANN_BUILD_TESTS)
     GIT_TAG v1.15.2
     EXCLUDE_FROM_ALL)
   FetchContent_MakeAvailable(googletest)
-  add_executable(betann_tests tests/binary_tests.cc
+  add_executable(betann_tests tests/arange_tests.cc
+                              tests/binary_tests.cc
                               tests/copy_tests.cc
                               tests/random_tests.cc
                               tests/sort_tests.cc)

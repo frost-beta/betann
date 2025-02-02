@@ -1,6 +1,8 @@
 #ifndef BETANN_UTILS_H_
 #define BETANN_UTILS_H_
 
+#include "betann/math.h"
+
 #include <algorithm>
 #include <numeric>
 #include <vector>
@@ -15,7 +17,7 @@ enum class DataType {
   f16,
 };
 
-inline size_t SizeOf(DataType dataType) {
+constexpr size_t SizeOf(DataType dataType) {
   switch (dataType) {
     case DataType::bool_:
     case DataType::i32:
@@ -27,7 +29,7 @@ inline size_t SizeOf(DataType dataType) {
   }
 }
 
-inline const char* WgslType(DataType dataType) {
+constexpr const char* WgslType(DataType dataType) {
   switch (dataType) {
     case DataType::bool_:
       return "bool";
@@ -50,18 +52,6 @@ template<> inline DataType GetDataType<bool>() { return DataType::bool_; }
 template<> inline DataType GetDataType<int32_t>() { return DataType::i32; }
 template<> inline DataType GetDataType<uint32_t>() { return DataType::u32; }
 template<> inline DataType GetDataType<float>() { return DataType::f32; }
-
-template<typename T, typename U>
-inline std::enable_if_t<std::is_unsigned_v<T> && std::is_unsigned_v<U>, T>
-DivCeil(T a, U b) {
-  return (a + (b - 1)) / b;
-}
-
-template<typename T, typename U>
-inline std::enable_if_t<std::is_unsigned_v<T> && std::is_unsigned_v<U>, T>
-DivFloor(T a, U b) {
-  return a / b;
-}
 
 inline uint32_t NumElements(const std::vector<uint32_t>& shape) {
   return std::accumulate(shape.begin(), shape.end(),

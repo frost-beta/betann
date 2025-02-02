@@ -16,9 +16,9 @@ class SortTests : public BetaNNTests {
                       axis,
                       inputType,
                       betann::SortResultType::Values,
-                      betann::GetDataType<T>(),
                       out,
                       strides,
+                      betann::GetDataType<T>(),
                       device_.CreateBufferFromVector(input),
                       shape,
                       strides);
@@ -40,9 +40,9 @@ class SortTests : public BetaNNTests {
                       axis,
                       inputType,
                       betann::SortResultType::Indices,
-                      betann::GetDataType<T>(),
                       sortedIndices,
                       strides,
+                      betann::GetDataType<T>(),
                       device_.CreateBufferFromVector(input),
                       shape,
                       strides);
@@ -79,8 +79,7 @@ TEST_F(SortTests, SingleBlockContiguous) {
 }
 
 TEST_F(SortTests, SingleBlockGeneral) {
-  std::vector<int32_t> a(24);
-  std::iota(a.begin(), a.end(), 1);
+  auto a = Iota<int32_t>(24, 1);
   EXPECT_EQ(RunSort<int32_t>(1,
                              betann::SortInputType::General,
                              a,

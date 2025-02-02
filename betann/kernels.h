@@ -9,6 +9,13 @@
 
 namespace betann {
 
+// Generate evenly spaced values.
+void ArrayRange(Device& device,
+                double start,
+                double step,
+                DataType dataType,
+                const wgpu::Buffer& out);
+
 enum class BinaryOpType {
   // Both operands are scalars.
   ScalarScalar,
@@ -119,9 +126,9 @@ void SortBlock(Device& device,
                uint32_t axis,
                SortInputType inputType,
                SortResultType resultType,
-               DataType dataType,
                const wgpu::Buffer& out,
                const std::vector<uint32_t>& outStrides,
+               DataType inputDataType,
                const wgpu::Buffer& input,
                const std::vector<uint32_t>& inputShape,
                const std::vector<uint32_t>& inputStrides);

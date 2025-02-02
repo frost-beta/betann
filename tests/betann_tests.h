@@ -28,6 +28,13 @@ class BetaNNTests : public testing::Test {
     return ret;
   }
 
+  template<typename T>
+  std::vector<T> Iota(size_t size, T start) {
+    std::vector<T> a(size);
+    std::iota(a.begin(), a.end(), start);
+    return a;
+  }
+
   betann::Device device_;
 
  private:

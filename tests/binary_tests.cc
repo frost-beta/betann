@@ -175,8 +175,7 @@ TEST_F(BinaryTests, General4D) {
       {7, 7, 3, 0},
       {4, 4, 4, 1});
   EXPECT_EQ(row, std::vector<uint32_t>({8, 9, 6, 4}));
-  std::vector<uint32_t> arange(16);
-  std::iota(arange.begin(), arange.end(), 1);
+  auto arange = Iota<uint32_t>(16, 1);
   std::vector<uint32_t> cube = RunBinaryOpGeneral<uint32_t, uint32_t>(
       "multiply",
       {2, 2, 2, 2},
@@ -194,10 +193,8 @@ TEST_F(BinaryTests, General4DLargeArrays) {
   std::vector<uint32_t> shape = {33, 33, 33, 33};
   std::vector<uint32_t> strides = {33 * 33 * 33, 33 * 33, 33, 1};
   uint32_t outputNumElements = betann::NumElements(shape);
-  std::vector<float> a(outputNumElements);
-  std::iota(a.begin(), a.end(), 1);
-  std::vector<float> b(outputNumElements);
-  std::iota(b.begin(), b.end(), 1);
+  auto a = Iota<float>(outputNumElements, 1);
+  auto b = Iota<float>(outputNumElements, 1);
   std::vector<float> c = RunBinaryOpGeneral<float, float>(
       "multiply", shape, a, strides, b, strides);
   std::vector<float> expected(outputNumElements);

@@ -67,6 +67,31 @@ void RunKernel(Device& device,
 
 }  // namespace
 
+void ArrayRange(Device& device,
+                double start,
+                double step,
+                DataType dataType,
+                const wgpu::Buffer& out) {
+  const uint32_t workgroupSize = 64;
+  uint32_t outNumElements = out.GetSize() / SizeOf(dataType);
+  RunKernel(device,
+            "arange",
+            WgslType(dataType),
+            [&]() {
+              return ParseTemplate(wgsl_source_arange,
+                                   {
+                                     {"enable_f16", device.SupportsF16()},
+                                     {"dtype", WgslType(dataType)},
+                                   });
+            },
+            {
+              device.CreateBufferFromScalar(start, dataType),
+              device.CreateBufferFromScalar(step, dataType),
+              out,
+            },
+            {DivCeil(outNumElements, workgroupSize)});
+}
+
 void BinaryOpContiguous(Device& device,
                         const char* name,
                         BinaryOpType type,
@@ -326,9 +351,9 @@ void SortBlock(Device& device,
                uint32_t axis,
                SortInputType inputType,
                SortResultType resultType,
-               DataType dataType,
                const wgpu::Buffer& out,
                const std::vector<uint32_t>& outStrides,
+               DataType inputDataType,
                const wgpu::Buffer& input,
                const std::vector<uint32_t>& inputShape,
                const std::vector<uint32_t>& inputStrides) {
@@ -361,8 +386,8 @@ void SortBlock(Device& device,
   } else {
     auto inputRestShape = removeAxis(inputShape, axis);
     if (inputRestShape.empty()) {
-      wgpu::Buffer zero = device.CreateBufferFromScalar<uint32_t>(
-          0, wgpu::BufferUsage::Storage);
+      wgpu::Buffer zero = device.CreateBufferFromScalar(
+          0, DataType::u32, wgpu::BufferUsage::Storage);
       buffers.push_back(zero);
       buffers.push_back(zero);
       buffers.push_back(zero);
@@ -375,12 +400,13 @@ void SortBlock(Device& device,
   bool argsort = resultType == SortResultType::Indices;
   RunKernel(device,
             "sort_block",
-            fmt::format("{}_{}_{}", WgslType(dataType), argsort, contiguous),
+            fmt::format("{}_{}_{}",
+                        WgslType(inputDataType), argsort, contiguous),
             [&]() {
               return ParseTemplate(wgsl_source_sort_block,
                                    {
                                      {"enable_f16", device.SupportsF16()},
-                                     {"dtype", WgslType(dataType)},
+                                     {"dtype", WgslType(inputDataType)},
                                      {"argsort", argsort},
                                      {"contiguous", contiguous},
                                    });

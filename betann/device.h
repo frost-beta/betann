@@ -1,6 +1,8 @@
 #ifndef BETANN_DEVICE_H_
 #define BETANN_DEVICE_H_
 
+#include "betann/utils.h"
+
 #include <map>
 #include <set>
 #include <string>
@@ -32,17 +34,39 @@ class Device {
       const void* data,
       size_t size,
       wgpu::BufferUsage usage = wgpu::BufferUsage::Storage);
-  template<typename T, typename = std::enable_if_t<std::is_scalar_v<T>>>
-  wgpu::Buffer CreateBufferFromScalar(
-      T data,
-      wgpu::BufferUsage usage = wgpu::BufferUsage::Uniform) {
-    return CreateBufferFromData(&data, sizeof(T), usage);
-  }
   template<typename T>
   wgpu::Buffer CreateBufferFromVector(
       const std::vector<T>& vec,
       wgpu::BufferUsage usage = wgpu::BufferUsage::Storage) {
     return CreateBufferFromData(vec.data(), vec.size() * sizeof(T), usage);
+  }
+
+  template<typename T, typename = std::enable_if_t<std::is_scalar_v<T>>>
+  wgpu::Buffer CreateBufferFromScalar(
+      T data,
+      DataType dataType = GetDataType<T>(),
+      wgpu::BufferUsage usage = wgpu::BufferUsage::Uniform) {
+    if (sizeof(T) == SizeOf(dataType))
+      return CreateBufferFromData(&data, sizeof(T), usage);
+    switch (dataType) {
+      case DataType::bool_:
+      case DataType::u32: {
+        uint32_t native = static_cast<uint32_t>(data);
+        return CreateBufferFromData(&native, SizeOf(dataType), usage);
+      }
+      case DataType::i32: {
+        int32_t native = static_cast<int32_t>(data);
+        return CreateBufferFromData(&native, SizeOf(dataType), usage);
+      }
+      case DataType::f32: {
+        float native = static_cast<float>(data);
+        return CreateBufferFromData(&native, SizeOf(dataType), usage);
+      }
+      case DataType::f16: {
+        uint64_t native = Float32ToFloat16(static_cast<float>(data));
+        return CreateBufferFromData(&native, SizeOf(dataType), usage);
+      }
+    }
   }
 
   wgpu::Buffer CopyToStagingBuffer(const wgpu::Buffer& buffer);
