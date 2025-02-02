@@ -142,6 +142,16 @@ void UnaryOpContiguous(Device& device,
                        const wgpu::Buffer& input,
                        uint32_t inputNumElements);
 
+// Run unary operations on virual input.
+void UnaryOpGeneral(Device& device,
+                    const char* name,
+                    DataType outputDataType,
+                    const wgpu::Buffer& output,
+                    DataType inputDataType,
+                    const wgpu::Buffer& input,
+                    const std::vector<uint32_t>& inputShape,
+                    const std::vector<uint32_t>& inputStrides);
+
 }  // namespace betann
 
 #endif  // BETANN_KERNELS_H_

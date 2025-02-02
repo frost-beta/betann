@@ -5,11 +5,11 @@ class UnaryTests : public BetaNNTests {
   template<typename T, typename U>
   std::vector<T> RunUnaryOpsContiguous(
       const char* op,
-      const std::vector<U>& inputs,
+      const std::vector<U>& input,
       betann::DataType outputDataType = betann::GetDataType<T>(),
       betann::DataType inputDataType = betann::GetDataType<U>()) {
     wgpu::Buffer out = device_.CreateBuffer(
-        inputs.size() * SizeOf(outputDataType),
+        input.size() * SizeOf(outputDataType),
         wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
     betann::UnaryOpContiguous(
         device_,
@@ -17,10 +17,34 @@ class UnaryTests : public BetaNNTests {
         outputDataType,
         out,
         inputDataType,
-        device_.CreateBufferFromVector(inputs, inputDataType),
-        inputs.size());
+        device_.CreateBufferFromVector(input, inputDataType),
+        input.size());
     device_.Flush();
-    return ReadFromBuffer<T>(out, inputs.size());
+    return ReadFromBuffer<T>(out, input.size());
+  }
+
+  template<typename T, typename U>
+  std::vector<T> RunUnaryOpsGeneral(
+      const char* op,
+      const std::vector<U>& input,
+      const std::vector<uint32_t>& inputShape,
+      const std::vector<uint32_t>& inputStrides,
+      betann::DataType outputDataType = betann::GetDataType<T>(),
+      betann::DataType inputDataType = betann::GetDataType<U>()) {
+    wgpu::Buffer out = device_.CreateBuffer(
+        input.size() * SizeOf(outputDataType),
+        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
+    betann::UnaryOpGeneral(
+        device_,
+        op,
+        outputDataType,
+        out,
+        inputDataType,
+        device_.CreateBufferFromVector(input, inputDataType),
+        inputShape,
+        inputStrides);
+    device_.Flush();
+    return ReadFromBuffer<T>(out, input.size());
   }
 };
 
@@ -28,27 +52,40 @@ TEST_F(UnaryTests, SpecialTypes) {
   EXPECT_EQ(RunUnaryOpsContiguous<uint32_t>("negative",
                                             std::vector<uint32_t>{100}),
             (std::vector<uint32_t>{4294967196}));
-  EXPECT_EQ(RunUnaryOpsContiguous<uint16_t>(
-                "exp",
-                std::vector<uint16_t>{
-                  betann::Float32ToFloat16(0.89),
-                  betann::Float32ToFloat16(0.64),
-                },
-                betann::DataType::f16),
-            (std::vector<uint16_t>{
-                betann::Float32ToFloat16(2.43555),
-                betann::Float32ToFloat16(1.89648),
-            }));
+  if (device_.SupportsF16()) {
+    EXPECT_EQ(RunUnaryOpsContiguous<uint16_t>(
+                  "exp",
+                  std::vector<uint16_t>{
+                    betann::Float32ToFloat16(0.89),
+                    betann::Float32ToFloat16(0.64),
+                  },
+                  betann::DataType::f16),
+              (std::vector<uint16_t>{
+                  betann::Float32ToFloat16(2.43555),
+                  betann::Float32ToFloat16(1.89648),
+              }));
+  }
 }
 
 TEST_F(UnaryTests, Contiguous) {
-  EXPECT_EQ(RunUnaryOpsContiguous<float>("sqrt",
-                                         std::vector<float>{0.64, 0.49, 0.36}),
-            (std::vector<float>{0.8, 0.7, 0.6}));
+  EXPECT_EQ(RunUnaryOpsContiguous<int32_t>("sqrt",
+                                           std::vector<int32_t>{64, 49, 36}),
+            (std::vector<int32_t>{8, 7, 6}));
   auto a = RandomNumbers<int32_t>(100);
-  std::vector<uint32_t> b;
-  for (int32_t i : a) {
-    b.push_back(std::sqrt(static_cast<float>(i)));
-  }
-  EXPECT_EQ(RunUnaryOpsContiguous<uint32_t>("sqrt", a), b);
+  EXPECT_EQ(RunUnaryOpsContiguous<int32_t>("sqrt", a),
+            Map(a, [](int32_t i) { return std::sqrt(static_cast<float>(i)); }));
+}
+
+TEST_F(UnaryTests, General) {
+  auto a = RandomNumbers<int32_t>(100);
+  EXPECT_EQ(RunUnaryOpsGeneral<int32_t>("negative",
+                                        a,
+                                        {10, 10, 10},
+                                        {100, 10, 1}),
+            Map(a, [](int32_t i) { return -i; }));
+  EXPECT_EQ(RunUnaryOpsGeneral<int32_t>("square",
+                                        a,
+                                        {2, 5, 10, 10},
+                                        {500, 100, 10, 1}),
+            Map(a, [](int32_t i) { return i * i; }));
 }

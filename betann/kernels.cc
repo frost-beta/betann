@@ -446,7 +446,7 @@ void UnaryOpContiguous(Device& device,
             [&]() {
               return Append(
                   ParseTemplate(
-                      wgsl_source_unary,
+                      wgsl_source_unary_contiguous,
                       {
                         {"enable_f16", device.SupportsF16()},
                         {"output_dtype", WgslType(outputDataType)},
@@ -464,6 +464,47 @@ void UnaryOpContiguous(Device& device,
             GetWorkgroupsCountContiguous(inputNumElements,
                                          maxThreadsPerGridDim,
                                          workgroupSize));
+}
+
+void UnaryOpGeneral(Device& device,
+                    const char* name,
+                    DataType outputDataType,
+                    const wgpu::Buffer& output,
+                    DataType inputDataType,
+                    const wgpu::Buffer& input,
+                    const std::vector<uint32_t>& inputShape,
+                    const std::vector<uint32_t>& inputStrides) {
+  const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
+  RunKernel(device,
+            fmt::format("unary_g_{}", name),
+            fmt::format("unary_g_{}_{}_{}",
+                        name,
+                        WgslType(outputDataType),
+                        WgslType(inputDataType)),
+            [&]() {
+              return Append(
+                  ParseTemplate(
+                      wgsl_source_unary_general,
+                      {
+                        {"enable_f16", device.SupportsF16()},
+                        {"output_dtype", WgslType(outputDataType)},
+                        {"input_dtype", WgslType(inputDataType)},
+                        {"op", name},
+                      }),
+                  ParseTemplate(
+                      wgsl_source_unary_ops,
+                      {
+                        {"input_is_floating", IsFloating(inputDataType)},
+                        {"input_is_unsigned", IsUnsigned(inputDataType)},
+                      }));
+            },
+            {
+              output,
+              input,
+              device.CreateBufferFromVector(inputShape),
+              device.CreateBufferFromVector(inputStrides),
+            },
+            GetWorkgroupsCountGeneral(inputShape, workgroupSize, 1));
 }
 
 }  // namespace betann

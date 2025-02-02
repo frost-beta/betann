@@ -35,6 +35,12 @@ class BetaNNTests : public testing::Test {
     return a;
   }
 
+  template<typename T, typename F>
+  std::vector<T> Map(std::vector<T> vec, F&& transform) {
+    std::transform(vec.begin(), vec.end(), vec.begin(), transform);
+    return vec;
+  }
+
   betann::Device device_;
 
  private:

@@ -156,14 +156,11 @@ TEST_F(BinaryTests, GeneralLargeArrays) {
   std::vector<uint32_t> shape = {33, 33, 33};
   std::vector<uint32_t> strides = {33 * 33, 33, 1};
   uint32_t outputNumElements = betann::NumElements(shape);
-  std::vector<float> a(outputNumElements);
-  std::fill(a.begin(), a.end(), 8);
-  std::vector<float> b(outputNumElements);
-  std::fill(b.begin(), b.end(), 8);
+  std::vector<float> a(outputNumElements, 8);
+  std::vector<float> b(outputNumElements, 8);
   std::vector<uint32_t> c = RunBinaryOpGeneral<uint32_t, float>(
       "multiply", shape, a, strides, b, strides);
-  EXPECT_TRUE(std::all_of(c.begin(), c.end(),
-                          [](uint32_t i) { return i == 64; }));
+  EXPECT_EQ(c, std::vector<uint32_t>(c.size(), 64));
 }
 
 TEST_F(BinaryTests, General4D) {
@@ -183,10 +180,7 @@ TEST_F(BinaryTests, General4D) {
       {8, 4, 2, 1},
       std::vector<uint32_t>(16, 2),
       {8, 4, 2, 1});
-  std::vector<uint32_t> expected(16);
-  std::transform(arange.begin(), arange.end(), expected.begin(),
-                 [](uint32_t i) { return i * 2; });
-  EXPECT_EQ(cube, expected);
+  EXPECT_EQ(cube, Map(arange, [](uint32_t i) { return i * 2; }));
 }
 
 TEST_F(BinaryTests, General4DLargeArrays) {
@@ -195,10 +189,7 @@ TEST_F(BinaryTests, General4DLargeArrays) {
   uint32_t outputNumElements = betann::NumElements(shape);
   auto a = Iota<float>(outputNumElements, 1);
   auto b = Iota<float>(outputNumElements, 1);
-  std::vector<float> c = RunBinaryOpGeneral<float, float>(
+  auto c = RunBinaryOpGeneral<float, float>(
       "multiply", shape, a, strides, b, strides);
-  std::vector<float> expected(outputNumElements);
-  std::transform(a.begin(), a.end(), expected.begin(),
-                 [](float i) { return i * i; });
-  EXPECT_EQ(c, expected);
+  EXPECT_EQ(c, Map(a, [](float i) { return i * i; }));
 }
