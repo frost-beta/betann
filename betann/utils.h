@@ -29,6 +29,14 @@ constexpr size_t SizeOf(DataType dataType) {
   }
 }
 
+constexpr bool IsFloating(DataType dataType) {
+  return dataType == DataType::f32 || dataType == DataType::f16;
+}
+
+constexpr bool IsUnsigned(DataType dataType) {
+  return dataType == DataType::u32;
+}
+
 constexpr const char* WgslType(DataType dataType) {
   switch (dataType) {
     case DataType::bool_:
@@ -52,6 +60,7 @@ template<> inline DataType GetDataType<bool>() { return DataType::bool_; }
 template<> inline DataType GetDataType<int32_t>() { return DataType::i32; }
 template<> inline DataType GetDataType<uint32_t>() { return DataType::u32; }
 template<> inline DataType GetDataType<float>() { return DataType::f32; }
+template<> inline DataType GetDataType<uint16_t>() { return DataType::f16; }
 
 inline uint32_t NumElements(const std::vector<uint32_t>& shape) {
   return std::accumulate(shape.begin(), shape.end(),

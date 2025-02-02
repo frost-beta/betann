@@ -133,6 +133,15 @@ void SortBlock(Device& device,
                const std::vector<uint32_t>& inputShape,
                const std::vector<uint32_t>& inputStrides);
 
+// Run unary operations on contiguous input.
+void UnaryOpContiguous(Device& device,
+                       const char* name,
+                       DataType outputDataType,
+                       const wgpu::Buffer& output,
+                       DataType inputDataType,
+                       const wgpu::Buffer& input,
+                       uint32_t inputNumElements);
+
 }  // namespace betann
 
 #endif  // BETANN_KERNELS_H_

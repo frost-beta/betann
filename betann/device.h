@@ -34,10 +34,13 @@ class Device {
       const void* data,
       size_t size,
       wgpu::BufferUsage usage = wgpu::BufferUsage::Storage);
+
   template<typename T>
   wgpu::Buffer CreateBufferFromVector(
       const std::vector<T>& vec,
+      DataType dataType = GetDataType<T>(),
       wgpu::BufferUsage usage = wgpu::BufferUsage::Storage) {
+    assert(sizeof(T) == SizeOf(dataType));
     return CreateBufferFromData(vec.data(), vec.size() * sizeof(T), usage);
   }
 

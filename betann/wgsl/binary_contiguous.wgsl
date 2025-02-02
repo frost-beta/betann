@@ -41,7 +41,7 @@ fn binary_vv_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
 
 @compute @workgroup_size(num_threads, 1, 1)
 fn binary_sv2_$op(@builtin(global_invocation_id) gid: vec3<u32>,
-                 @builtin(num_workgroups) num_workgroups: vec3<u32>) {
+                  @builtin(num_workgroups) num_workgroups: vec3<u32>) {
   let offset = gid.x + gid.y * (num_threads * num_workgroups.x);
   if (offset < arrayLength(&c)) {
     c[offset] = $op(a[0], b[offset]);
@@ -50,7 +50,7 @@ fn binary_sv2_$op(@builtin(global_invocation_id) gid: vec3<u32>,
 
 @compute @workgroup_size(num_threads, 1, 1)
 fn binary_vs2_$op(@builtin(global_invocation_id) gid: vec3<u32>,
-                 @builtin(num_workgroups) num_workgroups: vec3<u32>) {
+                  @builtin(num_workgroups) num_workgroups: vec3<u32>) {
   let offset = gid.x + gid.y * (num_threads * num_workgroups.x);
   if (offset < arrayLength(&c)) {
     c[offset] = $op(a[offset], b[0]);
@@ -59,7 +59,7 @@ fn binary_vs2_$op(@builtin(global_invocation_id) gid: vec3<u32>,
 
 @compute @workgroup_size(num_threads, 1, 1)
 fn binary_vv2_$op(@builtin(global_invocation_id) gid: vec3<u32>,
-                 @builtin(num_workgroups) num_workgroups: vec3<u32>) {
+                  @builtin(num_workgroups) num_workgroups: vec3<u32>) {
   let offset = gid.x + gid.y * (num_threads * num_workgroups.x);
   if (offset < arrayLength(&c)) {
     c[offset] = $op(a[offset], b[offset]);

@@ -55,7 +55,7 @@ void RunKernel(Device& device,
                std::vector<wgpu::Buffer> buffers,
                Dims3 workgroupsCount) {
   const wgpu::ShaderModule& shader = device.CreateShaderModule(
-      fmt::format("{}_{}", kernelName, shaderKey).c_str(),
+      shaderKey.c_str(),
       std::forward<F>(getSource));
   const wgpu::ComputePipeline& kernel = device.CreateKernel(
       shader,
@@ -76,7 +76,7 @@ void ArrayRange(Device& device,
   uint32_t outNumElements = out.GetSize() / SizeOf(dataType);
   RunKernel(device,
             "arange",
-            WgslType(dataType),
+            fmt::format("arange_{}", WgslType(dataType)),
             [&]() {
               return ParseTemplate(wgsl_source_arange,
                                    {
@@ -122,7 +122,8 @@ void BinaryOpContiguous(Device& device,
   }
   RunKernel(device,
             fmt::format("binary_{}_{}", typeStr, name),
-            fmt::format("{}_{}",
+            fmt::format("binary_{}_{}_{}",
+                        name,
                         WgslType(outputDataType),
                         WgslType(inputDataType)),
             [&]() {
@@ -158,7 +159,8 @@ void BinaryOpGeneral(Device& device,
             shape.size() > 3
                 ? fmt::format("binary_g_n{}_{}", workPerThread, name)
                 : fmt::format("binary_g{}_{}", shape.size(), name),
-            fmt::format("{}_{}",
+            fmt::format("binary_g_{}_{}_{}",
+                        name,
                         WgslType(outputDataType),
                         WgslType(inputDataType)),
             [&]() {
@@ -205,7 +207,9 @@ void CopyContiguous(Device& device,
   }
   RunKernel(device,
             fmt::format("copy_{}", typeStr),
-            fmt::format("{}_{}", WgslType(dstDataType), WgslType(srcDataType)),
+            fmt::format("copy_{}_{}",
+                        WgslType(dstDataType),
+                        WgslType(srcDataType)),
             [&]() {
               return ParseTemplate(wgsl_source_copy_contiguous,
                                    {
@@ -233,7 +237,9 @@ void CopyGeneral(Device& device,
             srcShape.size() > 3
                 ? fmt::format("copy_g_n{}", workPerThread)
                 : fmt::format("copy_g{}", srcShape.size()),
-            fmt::format("{}_{}", WgslType(dstDataType), WgslType(srcDataType)),
+            fmt::format("copy_g_{}_{}",
+                        WgslType(dstDataType),
+                        WgslType(srcDataType)),
             [&]() {
               return ParseTemplate(wgsl_source_copy_general,
                                    {
@@ -265,7 +271,9 @@ void CopyGeneralBoth(Device& device,
             srcShape.size() > 3
                 ? fmt::format("copy_gg_n{}", workPerThread)
                 : fmt::format("copy_gg{}", srcShape.size()),
-            fmt::format("{}_{}", WgslType(dstDataType), WgslType(srcDataType)),
+            fmt::format("copy_gg_{}_{}",
+                        WgslType(dstDataType),
+                        WgslType(srcDataType)),
             [&]() {
               return ParseTemplate(wgsl_source_copy_general_both,
                                    {
@@ -299,7 +307,7 @@ void RandomBitsContiguous(Device& device,
   workgroupsCount.y = DivCeil(outPerKey / 2 + (outPerKey % 2), workgroupSize);
   RunKernel(device,
             "rbits",
-            "contiguous",
+            "rbits",
             [&]() {
               return ParseTemplate(wgsl_source_random, {{"contiguous", true}});
             },
@@ -327,7 +335,7 @@ void RandomBitsGeneral(Device& device,
   workgroupsCount.y = DivCeil(outPerKey / 2 + (outPerKey % 2), workgroupSize);
   RunKernel(device,
             "rbits",
-            "general",
+            "rbits_g",
             [&]() {
               return ParseTemplate(wgsl_source_random, {{"contiguous", false}});
             },
@@ -400,8 +408,10 @@ void SortBlock(Device& device,
   bool argsort = resultType == SortResultType::Indices;
   RunKernel(device,
             "sort_block",
-            fmt::format("{}_{}_{}",
-                        WgslType(inputDataType), argsort, contiguous),
+            fmt::format("sort_{}_{}_{}",
+                        WgslType(inputDataType),
+                        argsort,
+                        contiguous),
             [&]() {
               return ParseTemplate(wgsl_source_sort_block,
                                    {
@@ -413,6 +423,47 @@ void SortBlock(Device& device,
             },
             buffers,
             {1, NumElements(inputShape) / sizeSortedAxis, 1});
+}
+
+void UnaryOpContiguous(Device& device,
+                       const char* name,
+                       DataType outputDataType,
+                       const wgpu::Buffer& output,
+                       DataType inputDataType,
+                       const wgpu::Buffer& input,
+                       uint32_t inputNumElements) {
+  const uint32_t workgroupSize = 64;  // TODO(zcbenz): make it dynamic
+  uint32_t maxThreadsPerGridDim =
+      device.GetLimits().maxComputeWorkgroupsPerDimension * workgroupSize;
+  bool use2DGrid = inputNumElements > maxThreadsPerGridDim;
+  bool inputIsIntegral = inputDataType == DataType::u32 ||
+                         inputDataType == DataType::i32;
+  RunKernel(device,
+            fmt::format("unary_{}_{}", use2DGrid ? "v2" : "v", name),
+            fmt::format("unary_{}_{}",
+                        WgslType(outputDataType),
+                        WgslType(inputDataType)),
+            [&]() {
+              return Append(
+                  ParseTemplate(
+                      wgsl_source_unary,
+                      {
+                        {"enable_f16", device.SupportsF16()},
+                        {"output_dtype", WgslType(outputDataType)},
+                        {"input_dtype", WgslType(inputDataType)},
+                        {"op", name},
+                      }),
+                  ParseTemplate(
+                      wgsl_source_unary_ops,
+                      {
+                        {"input_is_floating", IsFloating(inputDataType)},
+                        {"input_is_unsigned", IsUnsigned(inputDataType)},
+                      }));
+            },
+            {output, input},
+            GetWorkgroupsCountContiguous(inputNumElements,
+                                         maxThreadsPerGridDim,
+                                         workgroupSize));
 }
 
 }  // namespace betann
