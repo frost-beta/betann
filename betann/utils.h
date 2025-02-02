@@ -1,11 +1,12 @@
 #ifndef BETANN_UTILS_H_
 #define BETANN_UTILS_H_
 
-#include "betann/math.h"
-
 #include <algorithm>
 #include <numeric>
+#include <stdexcept>
 #include <vector>
+
+#include "betann/math.h"
 
 namespace betann {
 

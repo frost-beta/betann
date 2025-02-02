@@ -1,7 +1,6 @@
 #ifndef BETANN_KERNELS_H_
 #define BETANN_KERNELS_H_
 
-#include <stdexcept>
 #include <string>
 
 #include "betann/device.h"

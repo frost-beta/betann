@@ -1,8 +1,6 @@
 #ifndef BETANN_DEVICE_H_
 #define BETANN_DEVICE_H_
 
-#include "betann/utils.h"
-
 #include <map>
 #include <set>
 #include <string>
@@ -10,6 +8,8 @@
 #include <vector>
 
 #include <webgpu/webgpu_cpp.h>
+
+#include "betann/utils.h"
 
 namespace betann {
 
