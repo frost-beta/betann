@@ -24,21 +24,19 @@ fn unary_g_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
   // Get index in inputs.
-  var idx = work_per_thread * gid.x * strides[ndim - 1] + gid.y * strides[ndim - 2];
-  var elem = gid.z;
-  for (var d: i32 = ndim - 3; d >= 0; d--) {
-    idx += (elem % shape[d]) * strides[d];
-    elem /= shape[d];
-  }
+  var input_idx = coords_to_index(vec3(work_per_thread * gid.x, gid.yz),
+                                  &shape,
+                                  &strides);
   // Iterate and assign.
   let xstride = strides[ndim - 1];
   let out_idx = work_per_thread * gid.x + dim0 * (gid.y + dim1 * gid.z);
   for (var i: u32 = 0;
        i < work_per_thread && (work_per_thread * gid.x + i) < dim0;
        i++) {
-    output[out_idx + i] = output_dtype(betann_$op(input[idx]));
-    idx += xstride;
+    output[out_idx + i] = output_dtype(betann_$op(input[input_idx]));
+    input_idx += xstride;
   }
 }
 
 // include unary_ops.wgsl
+// include utils.wgsl

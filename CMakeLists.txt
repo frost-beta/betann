@@ -37,7 +37,8 @@ set(BETANN_WGSL_SOURCES betann/wgsl/arange.wgsl
                         betann/wgsl/sort_block.wgsl
                         betann/wgsl/unary_contiguous.wgsl
                         betann/wgsl/unary_general.wgsl
-                        betann/wgsl/unary_ops.wgsl)
+                        betann/wgsl/unary_ops.wgsl
+                        betann/wgsl/utils.wgsl)
 string(JOIN ":" BETANN_WGSL_SOURCES_ARG ${BETANN_WGSL_SOURCES})
 add_custom_command(
   OUTPUT gen/wgsl_sources.h

@@ -181,7 +181,8 @@ void BinaryOpGeneral(Device& device,
                                   {"input_dtype", WgslType(inputDataType)},
                                   {"op", name},
                                 }),
-                            wgsl_source_binary_ops);
+                            wgsl_source_binary_ops,
+                            wgsl_source_utils);
             },
             {
               output,
@@ -253,12 +254,14 @@ void CopyGeneral(Device& device,
                         WgslType(dstDataType),
                         WgslType(srcDataType)),
             [&]() {
-              return ParseTemplate(wgsl_source_copy_general,
-                                   {
-                                     {"enable_f16", device.SupportsF16()},
-                                     {"dst_dtype", WgslType(dstDataType)},
-                                     {"src_dtype", WgslType(srcDataType)},
-                                   });
+              return Append(
+                         ParseTemplate(wgsl_source_copy_general,
+                                       {
+                                         {"enable_f16", device.SupportsF16()},
+                                         {"dst_dtype", WgslType(dstDataType)},
+                                         {"src_dtype", WgslType(srcDataType)},
+                                       }),
+                         wgsl_source_utils);
             },
             {
               dst,
@@ -290,12 +293,14 @@ void CopyGeneralBoth(Device& device,
                         WgslType(dstDataType),
                         WgslType(srcDataType)),
             [&]() {
-              return ParseTemplate(wgsl_source_copy_general_both,
-                                   {
-                                     {"enable_f16", device.SupportsF16()},
-                                     {"dst_dtype", WgslType(dstDataType)},
-                                     {"src_dtype", WgslType(srcDataType)},
-                                   });
+              return Append(
+                         ParseTemplate(wgsl_source_copy_general_both,
+                                       {
+                                         {"enable_f16", device.SupportsF16()},
+                                         {"dst_dtype", WgslType(dstDataType)},
+                                         {"src_dtype", WgslType(srcDataType)},
+                                       }),
+                         wgsl_source_utils);
             },
             {
               dst,
@@ -327,7 +332,9 @@ void RandomBitsContiguous(Device& device,
             "rbits",
             "rbits",
             [&]() {
-              return ParseTemplate(wgsl_source_random, {{"contiguous", true}});
+              return Append(ParseTemplate(wgsl_source_random,
+                                          {{"contiguous", true}}),
+                            wgsl_source_utils);
             },
             {
               out,
@@ -355,7 +362,9 @@ void RandomBitsGeneral(Device& device,
             "rbits",
             "rbits_g",
             [&]() {
-              return ParseTemplate(wgsl_source_random, {{"contiguous", false}});
+              return Append(ParseTemplate(wgsl_source_random,
+                                          {{"contiguous", false}}),
+                            wgsl_source_utils);
             },
             {
               out,
@@ -431,13 +440,15 @@ void SortBlock(Device& device,
                         argsort,
                         contiguous),
             [&]() {
-              return ParseTemplate(wgsl_source_sort_block,
-                                   {
-                                     {"enable_f16", device.SupportsF16()},
-                                     {"dtype", WgslType(inputDataType)},
-                                     {"argsort", argsort},
-                                     {"contiguous", contiguous},
-                                   });
+              return Append(
+                         ParseTemplate(wgsl_source_sort_block,
+                                       {
+                                         {"enable_f16", device.SupportsF16()},
+                                         {"dtype", WgslType(inputDataType)},
+                                         {"argsort", argsort},
+                                         {"contiguous", contiguous},
+                                       }),
+                         wgsl_source_utils);
             },
             buffers,
             {1, NumElements(inputShape) / sizeSortedAxis, 1});
@@ -514,7 +525,8 @@ void UnaryOpGeneral(Device& device,
                       {
                         {"input_is_floating", IsFloating(inputDataType)},
                         {"input_is_unsigned", IsUnsigned(inputDataType)},
-                      }));
+                      }),
+                  wgsl_source_utils);
             },
             {
               output,

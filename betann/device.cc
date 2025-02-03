@@ -8,17 +8,9 @@
 namespace betann {
 
 Device::Device() {
-  // Intialize instance with feature flags.
-  std::array toggles = {
-    // Throw error immediately instead of delaying to next tick.
-    "enable_immediate_error_handling",
-  };
-  wgpu::DawnTogglesDescriptor togglesDescriptor;
-  togglesDescriptor.enabledToggles = toggles.data();
-  togglesDescriptor.enabledToggleCount = toggles.size();
+  // Create instance.
   wgpu::InstanceDescriptor instanceDescriptor;
   instanceDescriptor.features.timedWaitAnyEnable = true;
-  instanceDescriptor.nextInChain = &togglesDescriptor;
   instance_ = wgpu::CreateInstance(&instanceDescriptor);
   if (!instance_)
     throw std::runtime_error("CreateInstance failed.");
@@ -47,21 +39,38 @@ Device::Device() {
     throw std::runtime_error("There is no valid backend.");
   supportsF16_ = adapter_.HasFeature(wgpu::FeatureName::ShaderF16);
 
-  // Set limits for device.
+  // Toggles for device.
+  std::array toggles = {
+    // Throw error immediately instead of delaying to next tick.
+    "enable_immediate_error_handling",
+    // Improve performance.
+    "disable_lazy_clear_for_mapped_at_creation_buffer",
+    "disable_robustness",
+    "skip_validation",
+    // Work around a dawn bug:
+    // https://github.com/gpuweb/gpuweb/discussions/5063
+    "use_tint_ir",
+  };
+  wgpu::DawnTogglesDescriptor togglesDescriptor;
+  togglesDescriptor.enabledToggles = toggles.data();
+  togglesDescriptor.enabledToggleCount = toggles.size();
+  // Limits for device.
   wgpu::RequiredLimits requiredLimits;
   requiredLimits.limits.maxComputeInvocationsPerWorkgroup =
       512;  // used by general kernels
-  wgpu::DeviceDescriptor deviceDescriptor;
-  deviceDescriptor.label = "BetaNN Device";
-  deviceDescriptor.requiredLimits = &requiredLimits;
+  // Features for device.
   std::vector<wgpu::FeatureName> requiredFeatures;
   if (supportsF16_) {
     requiredFeatures.push_back(wgpu::FeatureName::ShaderF16);
   }
-  deviceDescriptor.requiredFeatures = requiredFeatures.data();
-  deviceDescriptor.requiredFeatureCount = requiredFeatures.size();
 
   // Synchronously request the device.
+  wgpu::DeviceDescriptor deviceDescriptor;
+  deviceDescriptor.nextInChain = &togglesDescriptor;
+  deviceDescriptor.requiredLimits = &requiredLimits;
+  deviceDescriptor.requiredFeatures = requiredFeatures.data();
+  deviceDescriptor.requiredFeatureCount = requiredFeatures.size();
+  deviceDescriptor.label = "BetaNN Device";
   deviceDescriptor.SetDeviceLostCallback(
       wgpu::CallbackMode::AllowSpontaneous,
       [](const wgpu::Device& device,

@@ -24,19 +24,8 @@ fn rbits(@builtin(global_invocation_id) gid: vec3<u32>) {
   if ($contiguous) {
     let key = vec2<u32>(keys[2 * gid.x], keys[2 * gid.x + 1]);
   } else {
-    let ndim = i32(arrayLength(&keys_shape));
-    var k1_elem = 2 * gid.x;
-    var k1_idx: u32 = 0;
-    for (var i = ndim - 1; i >= 0 && k1_elem > 0; i--) {
-      k1_idx += (k1_elem % keys_shape[i]) * keys_strides[i];
-      k1_elem /= keys_shape[i];
-    }
-    var k2_elem = 2 * gid.x + 1;
-    var k2_idx: u32 = 0;
-    for (var i = ndim - 1; i >= 0 && k2_elem > 0; i--) {
-      k2_idx += (k2_elem % keys_shape[i]) * keys_strides[i];
-      k2_elem /= keys_shape[i];
-    }
+    let k1_idx = coord_to_index(2 * gid.x, &keys_shape, &keys_strides);
+    let k2_idx = coord_to_index(2 * gid.x + 1, &keys_shape, &keys_strides);
     let key = vec2<u32>(keys[k1_idx], keys[k2_idx]);
   }
   let drop_last = odd == 1 && gid.y == half_size;
@@ -102,3 +91,5 @@ fn set_nth_byte_in_out(n: u32, byte: u32) {
   let index = n / 4;
   out[index] = set_nth_byte_in_u32(out[index], n % 4, byte);
 }
+
+// include utils.wgsl

@@ -36,24 +36,18 @@ if ($argsort) {
 fn sort_block(@builtin(workgroup_id) tid: vec3<u32>,
               @builtin(local_invocation_id) lid: vec3<u32>) {
   if ($contiguous) {
-    let out_offset = tid.y * out_stride_segment_axis;
-    let input_offset = tid.y * input_stride_segment_axis;
+    let out_idx = tid.y * out_stride_segment_axis;
+    let input_idx = tid.y * input_stride_segment_axis;
   } else {
     let ndim = arrayLength(&input_rest_shape);
-    var out_offset: u32 = 0;
-    var input_offset: u32 = 0;
-    var elem = tid.y;
-    for (var i = ndim - 1; i >= 0 && elem > 0; i--) {
-      out_offset += (elem % input_rest_shape[i]) * out_rest_strides[i];
-      input_offset += (elem % input_rest_shape[i]) * input_rest_strides[i];
-      elem /= input_rest_shape[i];
-    }
+    let out_idx = coord_to_index(tid.y, &input_rest_shape, &out_rest_strides);
+    let input_idx = coord_to_index(tid.y, &input_rest_shape, &input_rest_strides);
   }
 
   // Copy into workgroup memory.
   for (var i = lid.x; i < n_per_block; i += num_threads) {
     workgroup_vals[i] = select(dtype_max_value(),
-                               input[input_offset + i * input_stride_sorted_axis],
+                               input[input_idx + i * input_stride_sorted_axis],
                                i < size_sorted_axis);
     if ($argsort) {
       workgroup_idxs[i] = i;
@@ -67,7 +61,7 @@ fn sort_block(@builtin(workgroup_id) tid: vec3<u32>,
 
   // Write output.
   for (var i = lid.x; i < size_sorted_axis; i += num_threads) {
-    let out_idx = out_offset + i * out_stride_sorted_axis;
+    let out_idx = out_idx + i * out_stride_sorted_axis;
     if ($argsort) {
       indices[out_idx] = workgroup_idxs[i];
     } else {
@@ -215,3 +209,5 @@ if ($enable_f16) {
 fn dtype_max_value() -> dtype {
   return max_$dtype;
 }
+
+// include utils.wgsl
