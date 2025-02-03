@@ -34,7 +34,7 @@ std::tuple<size_t, size_t, std::string_view> GetBraceBody(std::string_view text,
         throw std::runtime_error("Too many } found.");
       braces--;
       if (braces == 0)
-        return {start + 1, i, text.substr(start, i - start)};
+        return {start, i, text.substr(start, i - start)};
     }
   }
   if (braces == 0)
