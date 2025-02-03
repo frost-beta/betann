@@ -11,6 +11,7 @@ override num_threads: u32 = 8;
 @group(0) @binding(1) var<storage, read> input: array<input_dtype>;
 @group(0) @binding(2) var<storage, read> shape: array<u32>;
 @group(0) @binding(3) var<storage, read> strides: array<u32>;
+@group(0) @binding(4) var<uniform> rest_dims: u32;
 
 @compute @workgroup_size(num_threads, num_threads, num_threads)
 fn unary_g_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -19,11 +20,7 @@ fn unary_g_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
   let ndim = i32(arrayLength(&shape));
   let dim0 = shape[ndim - 1];
   let dim1 = shape[ndim - 2];
-  var rest: u32 = 1;
-  for (var d: i32 = ndim - 3; d >= 0; d--) {
-    rest *= shape[d];
-  }
-  if (work_per_thread * gid.x >= dim0 || gid.y >= dim1 || gid.z >= rest) {
+  if (work_per_thread * gid.x >= dim0 || gid.y >= dim1 || gid.z >= rest_dims) {
     return;
   }
   // Get index in inputs.

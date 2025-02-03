@@ -47,6 +47,15 @@ Dims3 GetWorkgroupsCountGeneral(const std::vector<uint32_t>& shape,
   return workgroupsCount;
 }
 
+uint32_t GetRestDims(const std::vector<uint32_t>& shape) {
+  uint32_t rest = 1;
+  if (shape.size() > 3) {
+    for (int d = static_cast<int>(shape.size() - 3); d >= 0; d--)
+      rest *= shape[d];
+  }
+  return rest;
+}
+
 template<typename F>
 void RunKernel(Device& device,
                const std::string& kernelName,
@@ -181,6 +190,9 @@ void BinaryOpGeneral(Device& device,
               device.CreateBufferFromVector(aStrides),
               b,
               device.CreateBufferFromVector(bStrides),
+              shape.size() > 3
+                  ? device.CreateBufferFromScalar(GetRestDims(shape))
+                  : nullptr,
             },
             GetWorkgroupsCountGeneral(shape, workgroupSize, workPerThread));
 }
@@ -253,6 +265,9 @@ void CopyGeneral(Device& device,
               src,
               device.CreateBufferFromVector(srcShape),
               device.CreateBufferFromVector(srcStrides),
+              srcShape.size() > 3
+                  ? device.CreateBufferFromScalar(GetRestDims(srcShape))
+                  : nullptr,
             },
             GetWorkgroupsCountGeneral(srcShape, workgroupSize, workPerThread));
 }
@@ -288,6 +303,9 @@ void CopyGeneralBoth(Device& device,
               src,
               device.CreateBufferFromVector(srcShape),
               device.CreateBufferFromVector(srcStrides),
+              srcShape.size() > 3
+                  ? device.CreateBufferFromScalar(GetRestDims(srcShape))
+                  : nullptr,
             },
             GetWorkgroupsCountGeneral(srcShape, workgroupSize, workPerThread));
 }
@@ -503,6 +521,7 @@ void UnaryOpGeneral(Device& device,
               input,
               device.CreateBufferFromVector(inputShape),
               device.CreateBufferFromVector(inputStrides),
+              device.CreateBufferFromScalar(GetRestDims(inputShape)),
             },
             GetWorkgroupsCountGeneral(inputShape, workgroupSize, 1));
 }

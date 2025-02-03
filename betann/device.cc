@@ -234,6 +234,10 @@ wgpu::BindGroup Device::CreateBindGroup(const wgpu::ComputePipeline& kernel,
   std::vector<wgpu::BindGroupEntry> entries;
   uint32_t index = 0;
   for (wgpu::Buffer& buffer : buffers) {
+    if (!buffer) {
+      index++;
+      continue;
+    }
     wgpu::BindGroupEntry entry;
     entry.binding = index++;
     entry.buffer = std::move(buffer);

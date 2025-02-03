@@ -13,6 +13,7 @@ override num_threads: u32 = 8;
 @group(0) @binding(3) var<storage, read> a_strides: array<u32>;
 @group(0) @binding(4) var<storage, read> b: array<input_dtype>;
 @group(0) @binding(5) var<storage, read> b_strides: array<u32>;
+@group(0) @binding(6) var<uniform> rest_dims: u32;
 
 @compute @workgroup_size(num_threads, 1, 1)
 fn binary_g1_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -53,11 +54,7 @@ fn binary_g_n2_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
   let ndim = i32(arrayLength(&shape));
   let dim0 = shape[ndim - 1];
   let dim1 = shape[ndim - 2];
-  var rest: u32 = 1;
-  for (var d: i32 = ndim - 3; d >= 0; d--) {
-    rest *= shape[d];
-  }
-  if (work_per_thread * gid.x >= dim0 || gid.y >= dim1 || gid.z >= rest) {
+  if (work_per_thread * gid.x >= dim0 || gid.y >= dim1 || gid.z >= rest_dims) {
     return;
   }
   // Get index in a and b.

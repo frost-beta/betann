@@ -12,6 +12,7 @@ override num_threads: u32 = 8;
 @group(0) @binding(2) var<storage, read> src: array<src_dtype>;
 @group(0) @binding(3) var<storage, read> src_shape: array<u32>;
 @group(0) @binding(4) var<storage, read> src_strides: array<u32>;
+@group(0) @binding(5) var<uniform> src_rest_dims: u32;
 
 @compute @workgroup_size(num_threads, 1, 1)
 fn copy_gg1(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -50,11 +51,7 @@ fn copy_gg_n2(@builtin(global_invocation_id) gid: vec3<u32>) {
   let ndim = i32(arrayLength(&src_shape));
   let dim0 = src_shape[ndim - 1];
   let dim1 = src_shape[ndim - 2];
-  var rest: u32 = 1;
-  for (var d: i32 = ndim - 3; d >= 0; d--) {
-    rest *= src_shape[d];
-  }
-  if (work_per_thread * gid.x >= dim0 || gid.y >= dim1 || gid.z >= rest) {
+  if (work_per_thread * gid.x >= dim0 || gid.y >= dim1 || gid.z >= src_rest_dims) {
     return;
   }
   // Get index in src and dst.
