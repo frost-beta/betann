@@ -10,7 +10,7 @@ const work_per_thread: u32 = 8;
 const n_per_block = num_threads * work_per_thread;
 
 if ($argsort) {
-  @group(0) @binding(0) var<storage, read_write> indices: array<u32>;
+  @group(0) @binding(0) var<storage, read_write> out: array<u32>;
 } else {
   @group(0) @binding(0) var<storage, read_write> out: array<dtype>;
 }
@@ -39,7 +39,6 @@ fn sort_block(@builtin(workgroup_id) tid: vec3<u32>,
     let out_idx = tid.y * out_stride_segment_axis;
     let input_idx = tid.y * input_stride_segment_axis;
   } else {
-    let ndim = arrayLength(&input_rest_shape);
     let out_idx = coord_to_index(tid.y, &input_rest_shape, &out_rest_strides);
     let input_idx = coord_to_index(tid.y, &input_rest_shape, &input_rest_strides);
   }
@@ -63,7 +62,7 @@ fn sort_block(@builtin(workgroup_id) tid: vec3<u32>,
   for (var i = lid.x; i < size_sorted_axis; i += num_threads) {
     let out_idx = out_idx + i * out_stride_sorted_axis;
     if ($argsort) {
-      indices[out_idx] = workgroup_idxs[i];
+      out[out_idx] = workgroup_idxs[i];
     } else {
       out[out_idx] = workgroup_vals[i];
     }
@@ -85,7 +84,7 @@ fn sort_in_workgroup(size_sorted_axis: u32, lid: vec3<u32>) {
   // Per-thread odd-even sort.
   if (idx < size_sorted_axis) {
     for (var i: u32 = 0; i < work_per_thread; i++) {
-      for (var j: u32 = i & 1; j < work_per_thread; j += 2) {
+      for (var j: u32 = i & 1; j < work_per_thread - 1; j += 2) {
         if (compare_op(vals[j + 1], vals[j])) {
           let tmp1 = vals[j];
           vals[j] = vals[j + 1];
