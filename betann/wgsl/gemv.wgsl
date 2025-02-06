@@ -51,8 +51,11 @@ fn gemv(@builtin(workgroup_id) tid: vec3<u32>,
 
       // Accumulate results.
       for (var c = 0u; c < work_per_col; c++) {
-        // TODO(zcbenz): Use fma for floating numbers.
-        result[r] += intermediate[c] * coefficients[c];
+        if ($dtype_is_floating) {
+          result[r] = fma(intermediate[c], coefficients[c], result[r]);
+        } else {
+          result[r] += intermediate[c] * coefficients[c];
+        }
       }
     }
   }
@@ -68,8 +71,11 @@ fn gemv(@builtin(workgroup_id) tid: vec3<u32>,
                 mat_offset + mat_rows * mat_cols,
                 mat_offset + r * mat_cols + col);
       for (var c = 0u; c < work_per_col; c++) {
-        // TODO(zcbenz): Use fma for floating numbers.
-        result[r] += intermediate[c] * coefficients[c];
+        if ($dtype_is_floating) {
+          result[r] = fma(intermediate[c], coefficients[c], result[r]);
+        } else {
+          result[r] += intermediate[c] * coefficients[c];
+        }
       }
     }
   }

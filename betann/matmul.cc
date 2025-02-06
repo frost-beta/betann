@@ -28,13 +28,15 @@ void MatrixVectorMultiply(Device& device,
             fmt::format("gemv_{}_{}_{}",
                         WgslType(dataType), workPerRow, workgroupSizeRow),
             [&]() {
-              return ParseTemplate(wgsl_source_gemv,
-                                   {
-                                     {"enable_f16", device.SupportsF16()},
-                                     {"dtype", WgslType(dataType)},
-                                     {"work_per_row", workPerRow},
-                                     {"workgroup_size_row", workgroupSizeRow},
-                                   });
+              return ParseTemplate(
+                  wgsl_source_gemv,
+                  {
+                    {"enable_f16", device.SupportsF16()},
+                    {"dtype", WgslType(dataType)},
+                    {"dtype_is_floating", IsFloating(dataType)},
+                    {"work_per_row", workPerRow},
+                    {"workgroup_size_row", workgroupSizeRow},
+                  });
             },
             {
               out,

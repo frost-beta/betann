@@ -1,6 +1,7 @@
 #ifndef BETANN_PREPROCESSOR_H_
 #define BETANN_PREPROCESSOR_H_
 
+#include <cstdint>
 #include <map>
 #include <string>
 #include <variant>
