@@ -1,8 +1,6 @@
 #ifndef BETANN_KERNELS_H_
 #define BETANN_KERNELS_H_
 
-#include <string>
-
 #include "betann/device.h"
 #include "betann/utils.h"
 

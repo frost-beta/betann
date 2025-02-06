@@ -3,18 +3,12 @@
 #include <fmt/format.h>
 
 #include "betann/preprocessor.h"
-#include "betann/utils.h"
+#include "betann/kernels_helper.h"
 #include "wgsl_sources.h"
 
 namespace betann {
 
 namespace {
-
-template<typename... Args>
-inline std::string Append(std::string prefix, Args&&... args) {
-  ((prefix += args), ...);
-  return prefix;
-}
 
 Dims3 GetWorkgroupsCountContiguous(uint32_t numElements,
                                    uint32_t threadsPerDim,
@@ -54,24 +48,6 @@ uint32_t GetRestDims(const std::vector<uint32_t>& shape) {
       rest *= shape[d];
   }
   return rest;
-}
-
-template<typename F>
-void RunKernel(Device& device,
-               const std::string& kernelName,
-               const std::string& shaderKey,
-               F&& getSource,
-               std::vector<wgpu::Buffer> buffers,
-               Dims3 workgroupsCount) {
-  const wgpu::ShaderModule& shader = device.CreateShaderModule(
-      shaderKey.c_str(),
-      std::forward<F>(getSource));
-  const wgpu::ComputePipeline& kernel = device.CreateKernel(
-      shader,
-      kernelName.c_str());
-  device.RunKernel(kernel,
-                   device.CreateBindGroup(kernel, std::move(buffers)),
-                   workgroupsCount);
 }
 
 }  // namespace

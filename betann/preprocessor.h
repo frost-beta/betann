@@ -8,7 +8,7 @@
 namespace betann {
 
 using VariablesMap = std::map<std::string_view,
-                              std::variant<std::string_view, bool>>;
+                              std::variant<std::string_view, bool, uint32_t>>;
 // Provide a template string |templ|, return a new string that does following
 // replacements:
 // * Words like "$name" are replaced by |variables|.

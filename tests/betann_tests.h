@@ -20,11 +20,11 @@ class BetaNNTests : public testing::Test {
   }
 
   template<typename T>
-  std::vector<T> RandomNumbers(size_t size) {
-    std::uniform_int_distribution<T> dist(0, 8964);
+  std::vector<T> RandomNumbers(size_t size, int upper = 8964) {
+    std::uniform_int_distribution<int32_t> dist(1, upper);
     std::vector<T> ret;
     for (size_t i = 0; i < size; ++i)
-      ret.push_back(dist(mt_));
+      ret.push_back(static_cast<T>(dist(mt_)));
     return ret;
   }
 
@@ -39,6 +39,12 @@ class BetaNNTests : public testing::Test {
   std::vector<T> Map(std::vector<T> vec, F&& transform) {
     std::transform(vec.begin(), vec.end(), vec.begin(), transform);
     return vec;
+  }
+
+  template<typename T, typename... Args>
+  std::vector<T> Concat(std::vector<T> a, Args&&... args) {
+    ((a.insert(a.end(), args.begin(), args.end())), ...);
+    return a;
   }
 
   betann::Device device_;

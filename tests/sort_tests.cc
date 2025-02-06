@@ -55,12 +55,6 @@ class SortTests : public BetaNNTests {
     std::sort(a.begin(), a.end());
     return a;
   }
-
-  template<typename T>
-  std::vector<T> Concat(std::vector<T> a, const std::vector<T>& b) {
-    a.insert(a.end(), b.begin(), b.end());
-    return a;
-  }
 };
 
 TEST_F(SortTests, SingleBlockContiguous) {

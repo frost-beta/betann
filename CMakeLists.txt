@@ -13,12 +13,14 @@ add_library(betann STATIC)
 target_sources(betann PRIVATE betann/device.cc
                               betann/kernels.cc
                               betann/math.cc
+                              betann/matmul.cc
                               betann/preprocessor.cc
                       PUBLIC FILE_SET HEADERS
                              BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
                              FILES betann/betann.h
                                    betann/device.h
                                    betann/math.h
+                                   betann/matmul.h
                                    betann/kernels.h
                                    betann/utils.h)
 target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -33,6 +35,7 @@ set(BETANN_WGSL_SOURCES betann/wgsl/arange.wgsl
                         betann/wgsl/copy_contiguous.wgsl
                         betann/wgsl/copy_general.wgsl
                         betann/wgsl/copy_general_both.wgsl
+                        betann/wgsl/gemv.wgsl
                         betann/wgsl/random.wgsl
                         betann/wgsl/sort_block.wgsl
                         betann/wgsl/unary_contiguous.wgsl
@@ -102,11 +105,13 @@ if (BETANN_BUILD_TESTS)
   add_executable(betann_tests tests/arange_tests.cc
                               tests/binary_tests.cc
                               tests/copy_tests.cc
+                              tests/gemv_tests.cc
                               tests/random_tests.cc
                               tests/sort_tests.cc
                               tests/unary_tests.cc)
   target_link_libraries(betann_tests PRIVATE betann
-                                             GTest::gtest_main)
+                                             GTest::gtest_main
+                                             $<BUILD_INTERFACE:fmt::fmt-header-only>)
 endif()
 
 # Make the library installable.
