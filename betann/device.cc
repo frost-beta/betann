@@ -38,6 +38,8 @@ Device::Device() {
   if (info.backendType == wgpu::BackendType::Null)
     throw std::runtime_error("There is no valid backend.");
   supportsF16_ = adapter_.HasFeature(wgpu::FeatureName::ShaderF16);
+  supportsSubgroups_ = adapter_.HasFeature(wgpu::FeatureName::Subgroups);
+  supportsSubgroupsF16_ = adapter_.HasFeature(wgpu::FeatureName::SubgroupsF16);
 
   // Toggles for device.
   std::array toggles = {
@@ -60,9 +62,12 @@ Device::Device() {
       512;  // used by general kernels
   // Features for device.
   std::vector<wgpu::FeatureName> requiredFeatures;
-  if (supportsF16_) {
+  if (supportsF16_)
     requiredFeatures.push_back(wgpu::FeatureName::ShaderF16);
-  }
+  if (supportsSubgroups_)
+    requiredFeatures.push_back(wgpu::FeatureName::Subgroups);
+  if (supportsSubgroupsF16_)
+    requiredFeatures.push_back(wgpu::FeatureName::SubgroupsF16);
 
   // Synchronously request the device.
   wgpu::DeviceDescriptor deviceDescriptor;

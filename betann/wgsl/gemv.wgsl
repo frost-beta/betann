@@ -1,6 +1,12 @@
 if ($enable_f16) {
   enable f16;
 }
+if ($enable_subgroups) {
+  enable subgroups;
+}
+if ($enable_subgroups_f16) {
+  enable subgroups_f16;
+}
 
 alias dtype = $dtype;
 
@@ -15,18 +21,20 @@ const workgroup_size_col: u32 = 32;
 @group(0) @binding(3) var<uniform> mat_cols: u32;
 @group(0) @binding(4) var<storage, read> vec: array<dtype>;
 
-var<workgroup> workgroup_result: array<dtype, workgroup_size_row *
-                                              work_per_row *
-                                              workgroup_size_col>;
+if (!$enable_subgroups) {
+  var<workgroup> workgroup_result: array<dtype, workgroup_size_row *
+                                                work_per_row *
+                                                workgroup_size_col>;
+}
 
-@compute @workgroup_size(workgroup_size_row, workgroup_size_col)
+@compute @workgroup_size(workgroup_size_col, workgroup_size_row)
 fn gemv(@builtin(workgroup_id) tid: vec3<u32>,
         @builtin(local_invocation_id) lid: vec3<u32>) {
   const block_size_row = work_per_row * workgroup_size_row;
   const block_size_col = work_per_col * workgroup_size_col;
 
   // The row worked on.
-  var out_row = tid.x * block_size_row + lid.x * work_per_row;
+  var out_row = tid.x * block_size_row + lid.y * work_per_row;
 
   // Offset of current batch.
   let out_offset = tid.z * mat_rows + out_row;
@@ -40,7 +48,7 @@ fn gemv(@builtin(workgroup_id) tid: vec3<u32>,
 
   // Loop over vector.
   for (var block = 0u; block < mat_cols / block_size_col; block++) {
-    let col = lid.y * work_per_col + block * block_size_col;
+    let col = lid.x * work_per_col + block * block_size_col;
     // Load vector.
     load_unsafe(&coefficients, &vec, vec_offset + col);
 
@@ -63,8 +71,11 @@ fn gemv(@builtin(workgroup_id) tid: vec3<u32>,
   // Leftover in cols.
   let leftover = mat_cols % block_size_col;
   if (leftover != 0) {
-    let col = (mat_cols - leftover) + lid.y * work_per_col;
-    load_safe(&coefficients, &vec, vec_offset + mat_cols, vec_offset + col);
+    let col = (mat_cols - leftover) + lid.x * work_per_col;
+    load_safe(&coefficients,
+              &vec,
+              vec_offset + mat_cols,
+              vec_offset + col);
     for (var r = 0u; r < work_per_row; r++) {
       load_safe(&intermediate,
                 &mat,
@@ -80,29 +91,45 @@ fn gemv(@builtin(workgroup_id) tid: vec3<u32>,
     }
   }
 
-  // Write to shared memory.
-  for (var r = 0u; r < work_per_row; r++) {
-    let idx = (lid.x * work_per_row + r) * workgroup_size_col + lid.y;
-    workgroup_result[idx] = result[r];
-  }
-
-  // Workgroup accumulations.
-  workgroupBarrier();
-  for (var r = 0u; r < work_per_row; r++) {
-    let idx = (lid.x * work_per_row + r) * workgroup_size_col + lid.y;
-    for (var delta = workgroup_size_col / 2; delta >= 1; delta >>= 1) {
-      if (lid.y < delta) {
-        workgroup_result[idx] += workgroup_result[idx + delta];
+  if ($enable_subgroups) {
+    // Subgroup accumulations.
+    for (var r = 0u; r < work_per_row; r++) {
+      for (var delta = workgroup_size_col / 2; delta >= 1; delta >>= 1) {
+        result[r] += subgroupShuffleDown(result[r], delta);
       }
-      workgroupBarrier();
+    }
+  } else {
+    // Write to shared memory.
+    for (var r = 0u; r < work_per_row; r++) {
+      let idx = (lid.y * work_per_row + r) * workgroup_size_col + lid.x;
+      workgroup_result[idx] = result[r];
+    }
+
+    // Workgroup accumulations.
+    workgroupBarrier();
+    for (var r = 0u; r < work_per_row; r++) {
+      let idx = (lid.y * work_per_row + r) * workgroup_size_col + lid.x;
+      for (var delta = workgroup_size_col / 2; delta >= 1; delta >>= 1) {
+        if (lid.x < delta) {
+          workgroup_result[idx] += workgroup_result[idx + delta];
+        }
+        workgroupBarrier();
+      }
     }
   }
 
   // Write output.
+  if (lid.x != 0 || out_row >= mat_rows) {
+    return;
+  }
   for (var r = 0u; r < work_per_row; r++) {
     if (out_row + r < mat_rows) {
-      let idx = (lid.x * work_per_row + r) * workgroup_size_col;
-      out[out_offset + r] = workgroup_result[idx];
+      if ($enable_subgroups) {
+        out[out_offset + r] = result[r];
+      } else {
+        let idx = (lid.y * work_per_row + r) * workgroup_size_col;
+        out[out_offset + r] = workgroup_result[idx];
+      }
     }
   }
 }

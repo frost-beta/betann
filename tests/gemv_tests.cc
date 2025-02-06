@@ -50,6 +50,7 @@ TEST_F(MatrixVectorMultiplyTests, Contiguous) {
     {17, 129},
     {16 * 2 + 1, 32 * 8 + 1},
     {100, 100},
+    {5000, 100},
   };
   for (auto [M, N] : shapes) {
     auto a = RandomNumbers<int32_t>(M * N);

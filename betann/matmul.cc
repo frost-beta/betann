@@ -23,6 +23,12 @@ void MatrixVectorMultiply(Device& device,
   uint32_t batches = NumElements(matShape) / (matRows * matCols);
   const uint32_t workPerRow = matRows < 4 ? 1 : 4;
   const uint32_t workgroupSizeRow = matRows >= 4096 ? 8 : 4;
+  bool enableSubgroups = device.SupportsSubgroups();
+  bool enableSubgroupsF16 = false;
+  if (enableSubgroups && dataType == DataType::f16) {
+    enableSubgroups = device.SupportsF16() && device.SupportsSubgroupsF16();
+    enableSubgroupsF16 = enableSubgroups;
+  }
   RunKernel(device,
             "gemv",
             fmt::format("gemv_{}_{}_{}",
@@ -32,6 +38,8 @@ void MatrixVectorMultiply(Device& device,
                   wgsl_source_gemv,
                   {
                     {"enable_f16", device.SupportsF16()},
+                    {"enable_subgroups", enableSubgroups},
+                    {"enable_subgroups_f16", enableSubgroupsF16},
                     {"dtype", WgslType(dataType)},
                     {"dtype_is_floating", IsFloating(dataType)},
                     {"work_per_row", workPerRow},

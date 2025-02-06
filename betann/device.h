@@ -91,6 +91,8 @@ class Device {
 
   const wgpu::Limits& GetLimits() const { return limits_; }
   bool SupportsF16() const { return supportsF16_; }
+  bool SupportsSubgroups() const { return supportsSubgroups_; }
+  bool SupportsSubgroupsF16() const { return supportsSubgroupsF16_; }
 
  private:
   void EnsureEncoder();
@@ -105,6 +107,8 @@ class Device {
   wgpu::Queue queue_;
   wgpu::Limits limits_;
   bool supportsF16_ = false;
+  bool supportsSubgroups_ = false;
+  bool supportsSubgroupsF16_ = false;
 
   std::map<std::string, wgpu::ShaderModule> modules_;
   std::map<std::pair<WGPUShaderModule, std::string>,
