@@ -40,8 +40,10 @@ class MatrixVectorMultiplyTests : public BetaNNTests {
 
   std::vector<bool> GetParameters() {
     std::vector<bool> disableSubgroups{true};
+#ifdef __APPLE__  // assumes subgroup size be 32 which only works on mac
     if (device_.SupportsSubgroups())
       disableSubgroups.push_back(false);
+#endif
     return disableSubgroups;
   }
 };
@@ -98,7 +100,7 @@ TEST_F(MatrixVectorMultiplyTests, ContiguousBatches) {
       }
       SCOPED_TRACE(fmt::format("Subgroups: {}, Batch: {}, Shape: {}x{}",
                                !d, B, M, N));
-      EXPECT_EQ(GpuGemv(x, {B, M ,N}, y), z);
+      EXPECT_EQ(GpuGemv(x, {B, M ,N}, y, d), z);
     }
   }
 }

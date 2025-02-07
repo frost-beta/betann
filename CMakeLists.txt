@@ -26,6 +26,9 @@ target_sources(betann PRIVATE betann/device.cc
 target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
                                          $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
                                   PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/gen")
+if (CMAKE_COMPILER_IS_GNUCC)
+  target_compile_options(betann PUBLIC -Wno-return-type)
+endif()
 
 # Embed WGSL sources in binary.
 set(BETANN_WGSL_SOURCES betann/wgsl/arange.wgsl

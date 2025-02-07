@@ -24,6 +24,9 @@ void MatrixVectorMultiply(Device& device,
   uint32_t batches = NumElements(matShape) / (matRows * matCols);
   const uint32_t workPerRow = matRows < 4 ? 1 : 4;
   const uint32_t workgroupSizeRow = matRows >= 4096 ? 8 : 4;
+#ifndef __APPLE__  // assumes subgroup size be 32 which only works on mac
+  disableSubgroups = true;
+#endif
   bool enableSubgroups = !disableSubgroups && device.SupportsSubgroups();
   bool enableSubgroupsF16 = false;
   if (enableSubgroups && dataType == DataType::f16) {
