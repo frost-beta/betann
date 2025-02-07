@@ -12,7 +12,8 @@ void MatrixVectorMultiply(Device& device,
                           const wgpu::Buffer& out,
                           const wgpu::Buffer& mat,
                           const std::vector<uint32_t>& matShape,
-                          const wgpu::Buffer& vec);
+                          const wgpu::Buffer& vec,
+                          bool disableSubgroups = false);
 
 }  // namespace betann
 

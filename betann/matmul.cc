@@ -13,7 +13,8 @@ void MatrixVectorMultiply(Device& device,
                           const wgpu::Buffer& out,
                           const wgpu::Buffer& mat,
                           const std::vector<uint32_t>& matShape,
-                          const wgpu::Buffer& vec) {
+                          const wgpu::Buffer& vec,
+                          bool disableSubgroups) {
   if (matShape.size() < 2)
     throw std::runtime_error("Invalid matrix shape.");
   if (matShape.size() > 3)
@@ -23,7 +24,7 @@ void MatrixVectorMultiply(Device& device,
   uint32_t batches = NumElements(matShape) / (matRows * matCols);
   const uint32_t workPerRow = matRows < 4 ? 1 : 4;
   const uint32_t workgroupSizeRow = matRows >= 4096 ? 8 : 4;
-  bool enableSubgroups = device.SupportsSubgroups();
+  bool enableSubgroups = !disableSubgroups && device.SupportsSubgroups();
   bool enableSubgroupsF16 = false;
   if (enableSubgroups && dataType == DataType::f16) {
     enableSubgroups = device.SupportsF16() && device.SupportsSubgroupsF16();
@@ -31,8 +32,11 @@ void MatrixVectorMultiply(Device& device,
   }
   RunKernel(device,
             "gemv",
-            fmt::format("gemv_{}_{}_{}",
-                        WgslType(dataType), workPerRow, workgroupSizeRow),
+            fmt::format("gemv_{}_{}_{}_{}",
+                        WgslType(dataType),
+                        workPerRow,
+                        workgroupSizeRow,
+                        enableSubgroups),
             [&]() {
               return ParseTemplate(
                   wgsl_source_gemv,

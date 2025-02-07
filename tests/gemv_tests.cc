@@ -7,7 +7,8 @@ class MatrixVectorMultiplyTests : public BetaNNTests {
   template<typename T>
   std::vector<T> GpuGemv(const std::vector<T>& mat,
                          const std::vector<uint32_t>& shape,
-                         const std::vector<T>& vec) {
+                         const std::vector<T>& vec,
+                         bool disableSubgroups = false) {
     uint32_t outSize = betann::NumElements(shape) / shape[shape.size() - 1];
     wgpu::Buffer out = device_.CreateBuffer(
         outSize * sizeof(T),
@@ -17,7 +18,8 @@ class MatrixVectorMultiplyTests : public BetaNNTests {
                                  out,
                                  device_.CreateBufferFromVector(mat),
                                  shape,
-                                 device_.CreateBufferFromVector(vec));
+                                 device_.CreateBufferFromVector(vec),
+                                 disableSubgroups);
     device_.Flush();
     return ReadFromBuffer<T>(out, outSize);
   }
@@ -35,56 +37,68 @@ class MatrixVectorMultiplyTests : public BetaNNTests {
     }
     return result;
   }
+
+  std::vector<bool> GetParameters() {
+    std::vector<bool> disableSubgroups{true};
+    if (device_.SupportsSubgroups())
+      disableSubgroups.push_back(false);
+    return disableSubgroups;
+  }
 };
 
 TEST_F(MatrixVectorMultiplyTests, Contiguous) {
-  const uint32_t shapes[][2] = {
-    {1, 1},
-    {4, 1},
-    {4, 2},
-    {5, 1},
-    {5, 5},
-    {3, 31},
-    {4, 32},
-    {5, 33},
-    {17, 129},
-    {16 * 2 + 1, 32 * 8 + 1},
-    {100, 100},
-    {5000, 100},
-  };
-  for (auto [M, N] : shapes) {
-    auto a = RandomNumbers<int32_t>(M * N);
-    auto b = RandomNumbers<int32_t>(N);
-    SCOPED_TRACE(fmt::format("Shape: {}x{}", M, N));
-    EXPECT_EQ(GpuGemv(a, {M, N}, b), CpuGemv(a, M, N, b));
+  for (bool d : GetParameters()) {
+    const uint32_t shapes[][2] = {
+      {1, 1},
+      {4, 1},
+      {4, 2},
+      {5, 1},
+      {5, 5},
+      {3, 31},
+      {4, 32},
+      {5, 33},
+      {17, 129},
+      {16 * 2 + 1, 32 * 8 + 1},
+      {100, 100},
+      {5000, 100},
+    };
+    for (auto [M, N] : shapes) {
+      auto a = RandomNumbers<int32_t>(M * N);
+      auto b = RandomNumbers<int32_t>(N);
+      SCOPED_TRACE(fmt::format("Subgroups: {}, Shape: {}x{}", !d, M, N));
+      EXPECT_EQ(GpuGemv(a, {M, N}, b, d), CpuGemv(a, M, N, b));
+    }
   }
 }
 
 TEST_F(MatrixVectorMultiplyTests, ContiguousBatches) {
-  const uint32_t shapes[][3] = {
-    {2, 2, 2},
-    {2, 5, 33},
-    {2, 16, 128},
-    {2, 17, 129},
-    {8, 16 * 2 + 7, 32 * 8 + 7},
-  };
-  for (auto [B, M, N] : shapes) {
-    std::vector<float> x;
-    std::vector<float> y;
-    std::vector<std::vector<float>> batchX;
-    std::vector<std::vector<float>> batchY;
-    for (uint32_t b = 0; b < B; ++b) {
-      batchX.push_back(RandomNumbers<float>(M * N, 10));
-      x.insert(x.end(), batchX.back().begin(), batchX.back().end());
-      batchY.push_back(RandomNumbers<float>(N, 10));
-      y.insert(y.end(), batchY.back().begin(), batchY.back().end());
+  for (bool d : GetParameters()) {
+    const uint32_t shapes[][3] = {
+      {2, 2, 2},
+      {2, 5, 33},
+      {2, 16, 128},
+      {2, 17, 129},
+      {8, 16 * 2 + 7, 32 * 8 + 7},
+    };
+    for (auto [B, M, N] : shapes) {
+      std::vector<float> x;
+      std::vector<float> y;
+      std::vector<std::vector<float>> batchX;
+      std::vector<std::vector<float>> batchY;
+      for (uint32_t b = 0; b < B; ++b) {
+        batchX.push_back(RandomNumbers<float>(M * N, 10));
+        x.insert(x.end(), batchX.back().begin(), batchX.back().end());
+        batchY.push_back(RandomNumbers<float>(N, 10));
+        y.insert(y.end(), batchY.back().begin(), batchY.back().end());
+      }
+      std::vector<float> z;
+      for (uint32_t b = 0; b < B; ++b) {
+        auto result = CpuGemv(batchX[b], M, N, batchY[b]);
+        z.insert(z.end(), result.begin(), result.end());
+      }
+      SCOPED_TRACE(fmt::format("Subgroups: {}, Batch: {}, Shape: {}x{}",
+                               !d, B, M, N));
+      EXPECT_EQ(GpuGemv(x, {B, M ,N}, y), z);
     }
-    std::vector<float> z;
-    for (uint32_t b = 0; b < B; ++b) {
-      auto result = CpuGemv(batchX[b], M, N, batchY[b]);
-      z.insert(z.end(), result.begin(), result.end());
-    }
-    SCOPED_TRACE(fmt::format("Batch: {}, Shape: {}x{}", B, M, N));
-    EXPECT_EQ(GpuGemv(x, {B, M ,N}, y), z);
   }
 }
