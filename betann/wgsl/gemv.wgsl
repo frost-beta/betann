@@ -13,7 +13,7 @@ alias dtype = $dtype;
 const work_per_row: u32 = $work_per_row;
 const work_per_col: u32 = 4;
 const workgroup_size_row: u32 = $workgroup_size_row;
-const workgroup_size_col: u32 = $workgroup_size_col;
+const workgroup_size_col: u32 = 32;
 
 @group(0) @binding(0) var<storage, read_write> out: array<dtype>;
 @group(0) @binding(1) var<storage, read> mat: array<dtype>;
@@ -26,14 +26,23 @@ if (!$contiguous) {
   @group(0) @binding(7) var<storage, read> batch_strides_vec: array<u32>;
 }
 
-if (!$enable_subgroups) {
-  var<workgroup> workgroup_result: array<dtype, workgroup_size_row *
-                                                work_per_row *
-                                                workgroup_size_col>;
+// The workgroup_result collects results from each thread.
+if ($enable_subgroups) {
+  // For enable_subgroups we only need results from each subgroup, however
+  // as we don't know the subgroup_size we have to assume minimum size.
+  const workgroup_result_cols = workgroup_size_col / $subgroup_min_size;
+} else {
+  const workgroup_result_cols = workgroup_size_col;
 }
+var<workgroup> workgroup_result: array<dtype, workgroup_size_row *
+                                              work_per_row *
+                                              workgroup_result_cols>;
 
 @compute @workgroup_size(workgroup_size_col, workgroup_size_row)
-fn gemv(@builtin(workgroup_id) tid: vec3<u32>,
+fn gemv(if ($enable_subgroups) {
+          @builtin(subgroup_size) subgroup_size: u32,
+        }
+        @builtin(workgroup_id) tid: vec3<u32>,
         @builtin(local_invocation_id) lid: vec3<u32>) {
   const block_size_row = work_per_row * workgroup_size_row;
   const block_size_col = work_per_col * workgroup_size_col;
@@ -104,10 +113,35 @@ fn gemv(@builtin(workgroup_id) tid: vec3<u32>,
   }
 
   if ($enable_subgroups) {
+    // Subgroup size can be larger than workgroup size.
+    let subgroup_cols = min(subgroup_size, workgroup_size_col);
+    let subgroup_tid = lid.x / subgroup_cols;
+
     // Subgroup accumulations.
     for (var r = 0u; r < work_per_row; r++) {
-      for (var delta = workgroup_size_col / 2; delta >= 1; delta >>= 1) {
+      for (var delta = subgroup_cols / 2; delta >= 1; delta >>= 1) {
         result[r] += subgroupShuffleDown(result[r], delta);
+      }
+    }
+
+    // Write first lane's result to shared memory.
+    if (lid.x % subgroup_cols == 0) {
+      for (var r = 0u; r < work_per_row; r++) {
+        let idx = (lid.y * work_per_row + r) * workgroup_result_cols + subgroup_tid;
+        workgroup_result[idx] = result[r];
+      }
+    }
+
+    // Workgroup accumulations.
+    workgroupBarrier();
+    for (var r = 0u; r < work_per_row; r++) {
+      let idx = (lid.y * work_per_row + r) * workgroup_result_cols + subgroup_tid;
+      let num_subgroups = workgroup_size_col / subgroup_cols;
+      for (var delta = num_subgroups / 2; delta >= 1; delta >>= 1) {
+        if (lid.x % subgroup_cols == 0 && subgroup_tid < delta) {
+          workgroup_result[idx] += workgroup_result[idx + delta];
+        }
+        workgroupBarrier();
       }
     }
   } else {
@@ -136,12 +170,8 @@ fn gemv(@builtin(workgroup_id) tid: vec3<u32>,
   }
   for (var r = 0u; r < work_per_row; r++) {
     if (out_row + r < mat_rows) {
-      if ($enable_subgroups) {
-        out[out_offset + r] = result[r];
-      } else {
-        let idx = (lid.y * work_per_row + r) * workgroup_size_col;
-        out[out_offset + r] = workgroup_result[idx];
-      }
+      let idx = (lid.y * work_per_row + r) * workgroup_result_cols;
+      out[out_offset + r] = workgroup_result[idx];
     }
   }
 }

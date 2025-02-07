@@ -27,15 +27,6 @@ void MatrixVectorMultiply(Device& device,
   }
   const uint32_t workPerRow = matRows < 4 ? 1 : 4;
   const uint32_t workgroupSizeRow = matRows >= 4096 ? 8 : 4;
-  // The subgroups gemv kernel assumes num_threads per row equals to
-  // subgroups_size, so we don't need to have a shared memory for accumulations.
-  // For metal we can assume subgroups_size is 32, but for other platforms
-  // we have to pick the minimum value that subgroups_size can be.
-#ifdef __APPLE__
-  const uint32_t workgroupSizeCol = 32;
-#else
-  const uint32_t workgroupSizeCol = enableSubgroups ? 4 : 32;
-#endif
   std::vector<wgpu::Buffer> args = {
       out,
       mat,
@@ -51,12 +42,11 @@ void MatrixVectorMultiply(Device& device,
   }
   RunKernel(device,
             "gemv",
-            fmt::format("gemv_{}_{}_{}_{}_{}_{}",
+            fmt::format("gemv_{}_{}_{}_{}_{}",
                         WgslType(dataType),
                         contiguous,
                         workPerRow,
                         workgroupSizeRow,
-                        workgroupSizeCol,
                         enableSubgroups),
             [&]() {
               return Append(
@@ -69,9 +59,13 @@ void MatrixVectorMultiply(Device& device,
                         {"enable_f16", device.SupportsF16()},
                         {"enable_subgroups", enableSubgroups},
                         {"enable_subgroups_f16", enableSubgroupsF16},
+#ifdef __APPLE__
+                        {"subgroup_min_size", 32u},
+#else
+                        {"subgroup_min_size", 4u},
+#endif
                         {"work_per_row", workPerRow},
                         {"workgroup_size_row", workgroupSizeRow},
-                        {"workgroup_size_col", workgroupSizeCol},
                       }),
                   wgsl_source_utils);
             },
