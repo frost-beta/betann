@@ -8,18 +8,26 @@ class MatrixVectorMultiplyTests : public BetaNNTests {
   std::vector<T> GpuGemv(const std::vector<T>& mat,
                          const std::vector<uint32_t>& shape,
                          const std::vector<T>& vec,
-                         bool disableSubgroups = false) {
+                         bool disableSubgroups = false,
+                         const std::vector<uint32_t>& strides_mat = {},
+                         const std::vector<uint32_t>& strides_vec = {}) {
     uint32_t outSize = betann::NumElements(shape) / shape[shape.size() - 1];
     wgpu::Buffer out = device_.CreateBuffer(
         outSize * sizeof(T),
         wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
-    betann::MatrixVectorMultiply(device_,
-                                 betann::GetDataType<T>(),
-                                 out,
-                                 device_.CreateBufferFromVector(mat),
-                                 shape,
-                                 device_.CreateBufferFromVector(vec),
-                                 disableSubgroups);
+    betann::MatrixVectorMultiply(
+        device_,
+       betann::GetDataType<T>(),
+       shape.size() > 2 ? std::vector<uint32_t>(shape.begin(), shape.end() - 2)
+                        : std::vector<uint32_t>(),
+       out,
+       device_.CreateBufferFromVector(mat),
+       shape[shape.size() - 2],
+       shape[shape.size() - 1],
+       shape.size() > 3 ? strides_mat : std::vector<uint32_t>(),
+       device_.CreateBufferFromVector(vec),
+       shape.size() > 3 ? strides_vec : std::vector<uint32_t>(),
+       disableSubgroups);
     device_.Flush();
     return ReadFromBuffer<T>(out, outSize);
   }
@@ -101,4 +109,12 @@ TEST_F(MatrixVectorMultiplyTests, ContiguousBatches) {
       EXPECT_EQ(GpuGemv(x, {B, M ,N}, y, d), z);
     }
   }
+}
+
+TEST_F(MatrixVectorMultiplyTests, NonContiguous) {
+  auto a = RandomNumbers<float>(100, 10);
+  auto b = RandomNumbers<float>(100, 10);
+  auto c = CpuGemv(a, 10, 10, b);
+  EXPECT_EQ(GpuGemv(a, {2, 2, 10, 10}, b, false, {0, 0}, {0, 0}),
+            Concat(c, c, c, c));
 }

@@ -6,13 +6,16 @@
 
 namespace betann {
 
-// The gemv kernel with contiguous batches.
 void MatrixVectorMultiply(Device& device,
                           DataType dataType,
+                          const std::vector<uint32_t>& batchShape,
                           const wgpu::Buffer& out,
                           const wgpu::Buffer& mat,
-                          const std::vector<uint32_t>& matShape,
+                          uint32_t matRows,
+                          uint32_t matCols,
+                          const std::vector<uint32_t>& batchStridesMat,
                           const wgpu::Buffer& vec,
+                          const std::vector<uint32_t>& batchStridesVec,
                           bool disableSubgroups = false);
 
 }  // namespace betann

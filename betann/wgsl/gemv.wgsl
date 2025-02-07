@@ -20,6 +20,11 @@ const workgroup_size_col: u32 = $workgroup_size_col;
 @group(0) @binding(2) var<uniform> mat_rows: u32;
 @group(0) @binding(3) var<uniform> mat_cols: u32;
 @group(0) @binding(4) var<storage, read> vec: array<dtype>;
+if (!$contiguous) {
+  @group(0) @binding(5) var<storage, read> batch_shape: array<u32>;
+  @group(0) @binding(6) var<storage, read> batch_strides_mat: array<u32>;
+  @group(0) @binding(7) var<storage, read> batch_strides_vec: array<u32>;
+}
 
 if (!$enable_subgroups) {
   var<workgroup> workgroup_result: array<dtype, workgroup_size_row *
@@ -38,8 +43,15 @@ fn gemv(@builtin(workgroup_id) tid: vec3<u32>,
 
   // Offset of current batch.
   let out_offset = tid.z * mat_rows + out_row;
-  let mat_offset = tid.z * mat_rows * mat_cols + out_row * mat_cols;
-  let vec_offset = tid.z * mat_cols;
+  if ($contiguous) {
+    let mat_idx = tid.z;
+    let vec_idx = tid.z;
+  } else {
+    let mat_idx = coord_to_index(tid.z, &batch_shape, &batch_strides_mat);
+    let vec_idx = coord_to_index(tid.z, &batch_shape, &batch_strides_vec);
+  }
+  let mat_offset = mat_idx * mat_rows * mat_cols + out_row * mat_cols;
+  let vec_offset = vec_idx * mat_cols;
 
   // Per-thread result and intermediates.
   var result: array<dtype, work_per_row>;
@@ -150,3 +162,5 @@ fn load_safe(dst: ptr<function, array<dtype, work_per_col>>,
     dst[i] = select(0, src[offset + i], offset + i < src_size);
   }
 }
+
+// include utils

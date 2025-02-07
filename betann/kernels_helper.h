@@ -8,6 +8,12 @@
 
 namespace betann {
 
+template<typename... Args>
+inline std::string Append(std::string prefix, Args&&... args) {
+  ((prefix += args), ...);
+  return prefix;
+}
+
 template<typename F>
 void RunKernel(Device& device,
                const std::string& kernelName,

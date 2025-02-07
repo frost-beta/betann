@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <numeric>
 #include <stdexcept>
-#include <string>
 #include <vector>
 
 #include "betann/math.h"
@@ -77,12 +76,6 @@ inline uint32_t NumElements(const std::vector<uint32_t>& shape,
     offset += (shape[i] - 1) * strides[i];
   }
   return offset + 1;
-}
-
-template<typename... Args>
-inline std::string Append(std::string prefix, Args&&... args) {
-  ((prefix += args), ...);
-  return prefix;
 }
 
 }  // namespace betann
