@@ -40,10 +40,8 @@ class MatrixVectorMultiplyTests : public BetaNNTests {
 
   std::vector<bool> GetParameters() {
     std::vector<bool> disableSubgroups{true};
-#ifdef __APPLE__  // assumes subgroup size be 32 which only works on mac
     if (device_.SupportsSubgroups())
       disableSubgroups.push_back(false);
-#endif
     return disableSubgroups;
   }
 };

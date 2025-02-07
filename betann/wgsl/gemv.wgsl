@@ -13,7 +13,7 @@ alias dtype = $dtype;
 const work_per_row: u32 = $work_per_row;
 const work_per_col: u32 = 4;
 const workgroup_size_row: u32 = $workgroup_size_row;
-const workgroup_size_col: u32 = 32;
+const workgroup_size_col: u32 = $workgroup_size_col;
 
 @group(0) @binding(0) var<storage, read_write> out: array<dtype>;
 @group(0) @binding(1) var<storage, read> mat: array<dtype>;
