@@ -74,11 +74,13 @@ std::string ParseTemplate(std::string_view templ,
     auto [content, end, body] = GetBraceBody(templ, pos);
     bool condition = std::get<bool>(var) != no;
     result += KeepOnlyNewLines(templ.substr(start, content - start));
-    result += condition ? body : KeepOnlyNewLines(body);
+    result += condition ? ParseTemplate(body, variables)
+                        : KeepOnlyNewLines(body);
     if (templ.substr(end, 8) == "} else {") {
       auto [_, elseEnd, elseBody] = GetBraceBody(templ, end + 7);
       result += std::string(8, ' ');
-      result += condition ? KeepOnlyNewLines(elseBody) : elseBody;
+      result += condition ? KeepOnlyNewLines(elseBody)
+                          : ParseTemplate(elseBody, variables);
       templ = templ.substr(elseEnd + 1);
     } else {
       templ = templ.substr(end + 1);

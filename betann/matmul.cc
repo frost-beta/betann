@@ -61,8 +61,10 @@ void MatrixVectorMultiply(Device& device,
                         {"enable_subgroups_f16", enableSubgroupsF16},
 #ifdef __APPLE__
                         {"subgroup_min_size", 32u},
+                        {"needs_workgroup_reduction", !enableSubgroups},
 #else
                         {"subgroup_min_size", 4u},
+                        {"needs_workgroup_reduction", true},
 #endif
                         {"work_per_row", workPerRow},
                         {"workgroup_size_row", workgroupSizeRow},

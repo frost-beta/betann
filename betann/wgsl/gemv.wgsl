@@ -10,8 +10,12 @@ if ($enable_subgroups_f16) {
 
 alias dtype = $dtype;
 
+// Workload per thread.
 const work_per_row: u32 = $work_per_row;
 const work_per_col: u32 = 4;
+// Each workgroup works on (workgroup_size_row * work_per_row) rows and all
+// columns.
+// Each thread works on (mat_cols / (32 * work_per_col)) columns.
 const workgroup_size_row: u32 = $workgroup_size_row;
 const workgroup_size_col: u32 = 32;
 
@@ -27,16 +31,18 @@ if (!$contiguous) {
 }
 
 // The workgroup_result collects results from each thread.
-if ($enable_subgroups) {
-  // For enable_subgroups we only need results from each subgroup, however
-  // as we don't know the subgroup_size we have to assume minimum size.
-  const workgroup_result_cols = workgroup_size_col / $subgroup_min_size;
-} else {
-  const workgroup_result_cols = workgroup_size_col;
+if ($needs_workgroup_reduction) {
+  if ($enable_subgroups) {
+    // When enable_subgroups we only need results from each subgroup, however
+    // as we don't know the subgroup_size we have to assume minimum size.
+    const workgroup_result_cols = workgroup_size_col / $subgroup_min_size;
+  } else {
+    const workgroup_result_cols = workgroup_size_col;
+  }
+  var<workgroup> workgroup_result: array<dtype, workgroup_size_row *
+                                                work_per_row *
+                                                workgroup_result_cols>;
 }
-var<workgroup> workgroup_result: array<dtype, workgroup_size_row *
-                                              work_per_row *
-                                              workgroup_result_cols>;
 
 @compute @workgroup_size(workgroup_size_col, workgroup_size_row)
 fn gemv(if ($enable_subgroups) {
@@ -48,7 +54,7 @@ fn gemv(if ($enable_subgroups) {
   const block_size_col = work_per_col * workgroup_size_col;
 
   // The row worked on.
-  var out_row = tid.x * block_size_row + lid.y * work_per_row;
+  let out_row = tid.x * block_size_row + lid.y * work_per_row;
 
   // Offset of current batch.
   let out_offset = tid.z * mat_rows + out_row;
@@ -124,24 +130,26 @@ fn gemv(if ($enable_subgroups) {
       }
     }
 
-    // Write first lane's result to shared memory.
-    if (lid.x % subgroup_cols == 0) {
+    if ($needs_workgroup_reduction) {
+      // Write first lane's result to shared memory.
+      if (lid.x % subgroup_cols == 0) {
+        for (var r = 0u; r < work_per_row; r++) {
+          let idx = (lid.y * work_per_row + r) * workgroup_result_cols + subgroup_tid;
+          workgroup_result[idx] = result[r];
+        }
+      }
+
+      // Workgroup accumulations.
+      workgroupBarrier();
       for (var r = 0u; r < work_per_row; r++) {
         let idx = (lid.y * work_per_row + r) * workgroup_result_cols + subgroup_tid;
-        workgroup_result[idx] = result[r];
-      }
-    }
-
-    // Workgroup accumulations.
-    workgroupBarrier();
-    for (var r = 0u; r < work_per_row; r++) {
-      let idx = (lid.y * work_per_row + r) * workgroup_result_cols + subgroup_tid;
-      let num_subgroups = workgroup_size_col / subgroup_cols;
-      for (var delta = num_subgroups / 2; delta >= 1; delta >>= 1) {
-        if (lid.x % subgroup_cols == 0 && subgroup_tid < delta) {
-          workgroup_result[idx] += workgroup_result[idx + delta];
+        let num_subgroups = workgroup_size_col / subgroup_cols;
+        for (var delta = num_subgroups / 2; delta >= 1; delta >>= 1) {
+          if (lid.x % subgroup_cols == 0 && subgroup_tid < delta) {
+            workgroup_result[idx] += workgroup_result[idx + delta];
+          }
+          workgroupBarrier();
         }
-        workgroupBarrier();
       }
     }
   } else {
@@ -170,8 +178,12 @@ fn gemv(if ($enable_subgroups) {
   }
   for (var r = 0u; r < work_per_row; r++) {
     if (out_row + r < mat_rows) {
-      let idx = (lid.y * work_per_row + r) * workgroup_result_cols;
-      out[out_offset + r] = workgroup_result[idx];
+      if ($needs_workgroup_reduction) {
+        let idx = (lid.y * work_per_row + r) * workgroup_result_cols;
+        out[out_offset + r] = workgroup_result[idx];
+      } else {
+        out[out_offset + r] = result[r];
+      }
     }
   }
 }
@@ -193,4 +205,4 @@ fn load_safe(dst: ptr<function, array<dtype, work_per_col>>,
   }
 }
 
-// include utils
+// include utils.wgsl
