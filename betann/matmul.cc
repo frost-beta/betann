@@ -20,12 +20,22 @@ void MatrixVectorMultiply(Device& device,
                           const wgpu::Buffer& vec,
                           const std::vector<uint32_t>& batchStridesVec,
                           bool disableSubgroups) {
+  // Figure out whether to use subgroups kernel.
   bool enableSubgroups = !disableSubgroups && device.SupportsSubgroups();
   bool enableSubgroupsF16 = false;
+#ifndef __APPLE__
+  if (matTranspose) {
+    // There is no way to control subgroup size and it is usually too small for
+    // gemvt kernel.
+    enableSubgroups = false;
+  }
+#endif
   if (enableSubgroups && dataType == DataType::f16) {
     enableSubgroups = device.SupportsF16() && device.SupportsSubgroupsF16();
     enableSubgroupsF16 = enableSubgroups;
   }
+
+  // Determine the parameters according to data size.
   uint32_t groupCount, groupRows, groupCols, rowWorkPerThread, colWorkPerThread;
   if (matTranspose) {
     if (matCols >= 2048)
@@ -45,6 +55,7 @@ void MatrixVectorMultiply(Device& device,
     rowWorkPerThread = matRows < 4 ? 1 : 4;
     colWorkPerThread = 4;
   }
+
   std::vector<wgpu::Buffer> args = {
       out,
       mat,
@@ -60,12 +71,14 @@ void MatrixVectorMultiply(Device& device,
   }
   RunKernel(device,
             matTranspose ? "gemvt" : "gemv",
-            fmt::format("gemv_{}_{}_{}_{}_{}_{}_{}",
+            fmt::format("gemv_{}_{}_{}_{}_{}_{}_{}_{}_{}",
                         matTranspose,
                         contiguous,
                         enableSubgroups,
                         WgslType(dataType),
                         groupCount,
+                        groupRows,
+                        groupCols,
                         rowWorkPerThread,
                         colWorkPerThread),
             [&]() {

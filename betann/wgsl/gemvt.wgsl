@@ -18,8 +18,8 @@ const col_work_per_thread: u32 = $col_work_per_thread;
 // Each workgroup works on (group_cols * group_count) cols, and all rows.
 // Each thread works on (mat_cols / group_rows) rows.
 const group_count: u32 = $group_count;
-const group_rows: u32 = 8;
-const group_cols: u32 = 4;
+const group_rows: u32 = $group_rows;
+const group_cols: u32 = $group_cols;
 
 const group_size: u32 = group_rows * group_cols;
 const rows_per_workgroup = row_work_per_thread * group_rows;
@@ -36,7 +36,9 @@ if (!$contiguous) {
   @group(0) @binding(7) var<storage, read> batch_strides_vec: array<u32>;
 }
 
-var<workgroup> workgroup_result: array<dtype, group_rows * cols_per_workgroup>;
+if (!$enable_subgroups) {
+  var<workgroup> workgroup_result: array<dtype, group_rows * cols_per_workgroup>;
+}
 
 @compute @workgroup_size(group_size, group_count)
 fn gemvt(@builtin(workgroup_id) tid: vec3<u32>,
@@ -112,25 +114,34 @@ fn gemvt(@builtin(workgroup_id) tid: vec3<u32>,
     }
   }
 
-  // Write to shared memory.
-  for (var c = 0u; c < col_work_per_thread; c++) {
-    let idx = row_in_workgroup * cols_per_workgroup +
-              col_in_workgroup * col_work_per_thread +
-              c;
-    workgroup_result[idx] = result[c];
-  }
-
-  // Workgroup accumulations.
-  workgroupBarrier();
-  for (var c = 0u; c < col_work_per_thread; c++) {
-    let idx = row_in_workgroup * cols_per_workgroup +
-              col_in_workgroup * col_work_per_thread +
-              c;
-    for (var delta = group_rows / 2; delta >= 1; delta >>= 1) {
-      if (row_in_group < delta) {
-        workgroup_result[idx] += workgroup_result[idx + delta * cols_per_workgroup];
+  if ($enable_subgroups) {
+    // Subgroup accumulations.
+    for (var c = 0u; c < col_work_per_thread; c++) {
+      for (var delta = group_rows / 2; delta >= 1; delta >>= 1) {
+        result[c] += subgroupShuffleDown(result[c], delta * group_cols);
       }
-      workgroupBarrier();
+    }
+  } else {
+    // Write to shared memory.
+    for (var c = 0u; c < col_work_per_thread; c++) {
+      let idx = row_in_workgroup * cols_per_workgroup +
+                col_in_workgroup * col_work_per_thread +
+                c;
+      workgroup_result[idx] = result[c];
+    }
+
+    // Workgroup accumulations.
+    workgroupBarrier();
+    for (var c = 0u; c < col_work_per_thread; c++) {
+      let idx = row_in_workgroup * cols_per_workgroup +
+                col_in_workgroup * col_work_per_thread +
+                c;
+      for (var delta = group_rows / 2; delta >= 1; delta >>= 1) {
+        if (row_in_group < delta) {
+          workgroup_result[idx] += workgroup_result[idx + delta * cols_per_workgroup];
+        }
+        workgroupBarrier();
+      }
     }
   }
 
@@ -140,8 +151,12 @@ fn gemvt(@builtin(workgroup_id) tid: vec3<u32>,
   }
   for (var c = 0u; c < col_work_per_thread; c++) {
     if (out_col + c < mat_cols) {
-      let idx = col_in_workgroup * col_work_per_thread + c;
-      out[out_offset + c] = workgroup_result[idx];
+      if ($enable_subgroups) {
+        out[out_offset + c] = result[c];
+      } else {
+        let idx = col_in_workgroup * col_work_per_thread + c;
+        out[out_offset + c] = workgroup_result[idx];
+      }
     }
   }
 }

@@ -81,6 +81,15 @@ class MatrixVectorMultiplyTests : public BetaNNTests {
       disableSubgroups.push_back(false);
     return disableSubgroups;
   }
+
+  std::vector<bool> GetTransposeParameters() {
+    std::vector<bool> disableSubgroups{true};
+#ifdef __APPLE__
+    if (device_.SupportsSubgroups())
+      disableSubgroups.push_back(false);
+#endif
+    return disableSubgroups;
+  }
 };
 
 TEST_F(MatrixVectorMultiplyTests, Contiguous) {
@@ -149,8 +158,7 @@ TEST_F(MatrixVectorMultiplyTests, NonContiguous) {
 }
 
 TEST_F(MatrixVectorMultiplyTests, TransposeContiguous) {
-  // for (bool d : GetParameters()) {
-    bool d = true;
+  for (bool d : GetTransposeParameters()) {
     const uint32_t shapes[][2] = {
       {1, 1},
       {1, 4},
@@ -173,12 +181,11 @@ TEST_F(MatrixVectorMultiplyTests, TransposeContiguous) {
       SCOPED_TRACE(fmt::format("Subgroups: {}, Shape: {}x{}", !d, M, N));
       EXPECT_EQ(GpuGemvt(a, {M, N}, b, d), CpuGemvt(a, M, N, b));
     }
-  // }
+  }
 }
 
 TEST_F(MatrixVectorMultiplyTests, TransposeContiguousBatches) {
-  // for (bool d : GetParameters()) {
-    bool d = true;
+  for (bool d : GetTransposeParameters()) {
     const uint32_t shapes[][3] = {
       {2, 2, 2},
       {2, 33, 5},
@@ -206,7 +213,7 @@ TEST_F(MatrixVectorMultiplyTests, TransposeContiguousBatches) {
                                !d, B, M, N));
       EXPECT_EQ(GpuGemvt(x, {B, M ,N}, y, d), z);
     }
-  // }
+  }
 }
 
 TEST_F(MatrixVectorMultiplyTests, TranposeNonContiguous) {
