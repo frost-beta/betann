@@ -36,6 +36,13 @@ class Device {
       wgpu::BufferUsage usage = wgpu::BufferUsage::Storage);
 
   template<typename T>
+  wgpu::Buffer CreateBufferFromStruct(
+      const T& obj,
+      wgpu::BufferUsage usage = wgpu::BufferUsage::Storage) {
+    return CreateBufferFromData(&obj, sizeof(T), usage);
+  }
+
+  template<typename T>
   wgpu::Buffer CreateBufferFromVector(
       const std::vector<T>& vec,
       DataType dataType = GetDataType<T>(),

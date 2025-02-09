@@ -1,3 +1,10 @@
+struct dims_t {
+  ndim: u32,
+  dim0: u32,
+  dim1: u32,
+  rest: u32,
+};
+
 fn coords_to_index_d1(coords_x: u32,
                       strides: ptr<storage, array<u32>>) -> u32 {
   return coords_x * strides[0];

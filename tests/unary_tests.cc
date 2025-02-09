@@ -32,7 +32,7 @@ class UnaryTests : public BetaNNTests {
       betann::DataType outputDataType = betann::GetDataType<T>(),
       betann::DataType inputDataType = betann::GetDataType<U>()) {
     wgpu::Buffer out = device_.CreateBuffer(
-        input.size() * SizeOf(outputDataType),
+        betann::NumElements(inputShape, inputStrides) * SizeOf(outputDataType),
         wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
     betann::UnaryOpGeneral(
         device_,
@@ -77,7 +77,7 @@ TEST_F(UnaryTests, Contiguous) {
 }
 
 TEST_F(UnaryTests, General) {
-  auto a = RandomNumbers<int32_t>(100);
+  auto a = RandomNumbers<int32_t>(1000);
   EXPECT_EQ(RunUnaryOpsGeneral<int32_t>("negative",
                                         a,
                                         {10, 10, 10},

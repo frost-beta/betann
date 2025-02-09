@@ -10,6 +10,25 @@ namespace betann {
 
 namespace {
 
+struct Dims {
+  uint32_t ndim;
+  uint32_t dim0 = 1;
+  uint32_t dim1 = 1;
+  uint32_t rest = 1;
+};
+
+Dims GetDims(const std::vector<uint32_t>& shape) {
+  Dims dims;
+  dims.ndim = shape.size();
+  dims.dim0 = dims.ndim > 0 ? shape[dims.ndim - 1] : 1;
+  dims.dim1 = dims.ndim > 1 ? shape[dims.ndim - 2] : 1;
+  if (dims.ndim > 3) {
+    for (int d = static_cast<int>(dims.ndim - 3); d >= 0; d--)
+      dims.rest *= shape[d];
+  }
+  return dims;
+}
+
 Dims3 GetWorkgroupsCountContiguous(uint32_t numElements,
                                    uint32_t threadsPerDim,
                                    uint32_t workgroupSize) {
@@ -26,28 +45,14 @@ Dims3 GetWorkgroupsCountContiguous(uint32_t numElements,
 Dims3 GetWorkgroupsCountGeneral(const std::vector<uint32_t>& shape,
                                 uint32_t workgroupSize,
                                 uint32_t workPerThread) {
-  size_t numElements = NumElements(shape);
-  size_t ndim = shape.size();
-  size_t dim0 = ndim > 0 ? shape[ndim - 1] : 1;
-  size_t dim1 = ndim > 1 ? shape[ndim - 2] : 1;
-  size_t rest = numElements / (dim0 * dim1);
-  if (ndim > 3) {
-    dim0 = (dim0 + workPerThread - 1) / workPerThread;
-  }
+  Dims dims = GetDims(shape);
+  if (dims.ndim > 3)
+    dims.dim0 = (dims.dim0 + workPerThread - 1) / workPerThread;
   Dims3 workgroupsCount;
-  workgroupsCount.x = DivCeil(dim0, workgroupSize);
-  workgroupsCount.y = DivCeil(dim1, workgroupSize);
-  workgroupsCount.z = DivCeil(rest, workgroupSize);
+  workgroupsCount.x = DivCeil(dims.dim0, workgroupSize);
+  workgroupsCount.y = DivCeil(dims.dim1, workgroupSize);
+  workgroupsCount.z = DivCeil(dims.rest, workgroupSize);
   return workgroupsCount;
-}
-
-uint32_t GetRestDims(const std::vector<uint32_t>& shape) {
-  uint32_t rest = 1;
-  if (shape.size() > 3) {
-    for (int d = static_cast<int>(shape.size() - 3); d >= 0; d--)
-      rest *= shape[d];
-  }
-  return rest;
 }
 
 }  // namespace
@@ -170,7 +175,7 @@ void BinaryOpGeneral(Device& device,
               b,
               device.CreateBufferFromVector(bStrides),
               shape.size() > 3
-                  ? device.CreateBufferFromScalar(GetRestDims(shape))
+                  ? device.CreateBufferFromStruct(GetDims(shape))
                   : nullptr,
             },
             GetWorkgroupsCountGeneral(shape, workgroupSize, workPerThread));
@@ -249,7 +254,7 @@ void CopyGeneral(Device& device,
               device.CreateBufferFromVector(srcShape),
               device.CreateBufferFromVector(srcStrides),
               srcShape.size() > 3
-                  ? device.CreateBufferFromScalar(GetRestDims(srcShape))
+                  ? device.CreateBufferFromStruct(GetDims(srcShape))
                   : nullptr,
             },
             GetWorkgroupsCountGeneral(srcShape, workgroupSize, workPerThread));
@@ -291,7 +296,7 @@ void CopyGeneralBoth(Device& device,
               device.CreateBufferFromVector(srcShape),
               device.CreateBufferFromVector(srcStrides),
               srcShape.size() > 3
-                  ? device.CreateBufferFromScalar(GetRestDims(srcShape))
+                  ? device.CreateBufferFromStruct(GetDims(srcShape))
                   : nullptr,
             },
             GetWorkgroupsCountGeneral(srcShape, workgroupSize, workPerThread));
@@ -517,7 +522,7 @@ void UnaryOpGeneral(Device& device,
               input,
               device.CreateBufferFromVector(inputShape),
               device.CreateBufferFromVector(inputStrides),
-              device.CreateBufferFromScalar(GetRestDims(inputShape)),
+              device.CreateBufferFromStruct(GetDims(inputShape)),
             },
             GetWorkgroupsCountGeneral(inputShape, workgroupSize, 1));
 }
