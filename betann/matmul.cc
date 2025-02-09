@@ -13,6 +13,7 @@ void MatrixVectorMultiply(Device& device,
                           const std::vector<uint32_t>& batchShape,
                           const wgpu::Buffer& out,
                           const wgpu::Buffer& mat,
+                          bool matTranspose,
                           uint32_t matRows,
                           uint32_t matCols,
                           const std::vector<uint32_t>& batchStridesMat,
@@ -25,8 +26,25 @@ void MatrixVectorMultiply(Device& device,
     enableSubgroups = device.SupportsF16() && device.SupportsSubgroupsF16();
     enableSubgroupsF16 = enableSubgroups;
   }
-  const uint32_t workPerRow = matRows < 4 ? 1 : 4;
-  const uint32_t workgroupSizeRow = matRows >= 4096 ? 8 : 4;
+  uint32_t groupCount, groupRows, groupCols, rowWorkPerThread, colWorkPerThread;
+  if (matTranspose) {
+    if (matCols >= 2048)
+      groupCount = 16;
+    else if (matCols >= 512)
+      groupCount = 4;
+    else
+      groupCount = 2;
+    groupRows = 8;
+    groupCols = 4;
+    rowWorkPerThread = 4;
+    colWorkPerThread = matCols < 4 ? 1 : 4;
+  } else {
+    groupCount = matRows >= 4096 ? 8 : 4;
+    groupRows = 1;  // not used in gemv
+    groupCols = 32;  // not used in gemv
+    rowWorkPerThread = matRows < 4 ? 1 : 4;
+    colWorkPerThread = 4;
+  }
   std::vector<wgpu::Buffer> args = {
       out,
       mat,
@@ -41,17 +59,19 @@ void MatrixVectorMultiply(Device& device,
     args.push_back(device.CreateBufferFromVector(batchStridesVec));
   }
   RunKernel(device,
-            "gemv",
-            fmt::format("gemv_{}_{}_{}_{}_{}",
-                        WgslType(dataType),
+            matTranspose ? "gemvt" : "gemv",
+            fmt::format("gemv_{}_{}_{}_{}_{}_{}_{}",
+                        matTranspose,
                         contiguous,
-                        workPerRow,
-                        workgroupSizeRow,
-                        enableSubgroups),
+                        enableSubgroups,
+                        WgslType(dataType),
+                        groupCount,
+                        rowWorkPerThread,
+                        colWorkPerThread),
             [&]() {
               return Append(
                   ParseTemplate(
-                      wgsl_source_gemv,
+                      matTranspose ? wgsl_source_gemvt : wgsl_source_gemv,
                       {
                         {"contiguous", contiguous},
                         {"dtype", WgslType(dataType)},
@@ -59,21 +79,26 @@ void MatrixVectorMultiply(Device& device,
                         {"enable_f16", device.SupportsF16()},
                         {"enable_subgroups", enableSubgroups},
                         {"enable_subgroups_f16", enableSubgroupsF16},
+                        {"group_count", groupCount},
+                        {"group_rows", groupRows},
+                        {"group_cols", groupCols},
+                        {"row_work_per_thread", rowWorkPerThread},
+                        {"col_work_per_thread", colWorkPerThread},
 #ifdef __APPLE__
-                        {"subgroup_min_size", 32u},
                         {"needs_workgroup_reduction", !enableSubgroups},
+                        {"subgroup_min_size", 32u},
 #else
-                        {"subgroup_min_size", 4u},
                         {"needs_workgroup_reduction", true},
+                        {"subgroup_min_size", 4u},
 #endif
-                        {"work_per_row", workPerRow},
-                        {"workgroup_size_row", workgroupSizeRow},
                       }),
                   wgsl_source_utils);
             },
             args,
             {
-              DivCeil(matRows, workPerRow * workgroupSizeRow),
+              matTranspose
+                  ? DivCeil(matCols, colWorkPerThread * groupCount * groupCols)
+                  : DivCeil(matRows, rowWorkPerThread * groupCount * groupRows),
               1,
               NumElements(batchShape),
             });

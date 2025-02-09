@@ -11,12 +11,12 @@ if ($enable_subgroups_f16) {
 alias dtype = $dtype;
 
 // Workload per thread.
-const work_per_row: u32 = $work_per_row;
-const work_per_col: u32 = 4;
-// Each workgroup works on (workgroup_size_row * work_per_row) rows and all
+const row_work_per_thread: u32 = $row_work_per_thread;
+const col_work_per_thread: u32 = $col_work_per_thread;
+// Each workgroup works on (workgroup_size_row * row_work_per_thread) rows and all
 // columns.
-// Each thread works on (mat_cols / (32 * work_per_col)) columns.
-const workgroup_size_row: u32 = $workgroup_size_row;
+// Each thread works on (mat_cols / workgroup_size_col) columns.
+const workgroup_size_row: u32 = $group_count;
 const workgroup_size_col: u32 = 32;
 
 @group(0) @binding(0) var<storage, read_write> out: array<dtype>;
@@ -40,7 +40,7 @@ if ($needs_workgroup_reduction) {
     const workgroup_result_cols = workgroup_size_col;
   }
   var<workgroup> workgroup_result: array<dtype, workgroup_size_row *
-                                                work_per_row *
+                                                row_work_per_thread *
                                                 workgroup_result_cols>;
 }
 
@@ -50,11 +50,11 @@ fn gemv(if ($enable_subgroups) {
         }
         @builtin(workgroup_id) tid: vec3<u32>,
         @builtin(local_invocation_id) lid: vec3<u32>) {
-  const block_size_row = work_per_row * workgroup_size_row;
-  const block_size_col = work_per_col * workgroup_size_col;
+  const block_size_row = row_work_per_thread * workgroup_size_row;
+  const block_size_col = col_work_per_thread * workgroup_size_col;
 
   // The row worked on.
-  let out_row = tid.x * block_size_row + lid.y * work_per_row;
+  let out_row = tid.x * block_size_row + lid.y * row_work_per_thread;
 
   // Offset of current batch.
   let out_offset = tid.z * mat_rows + out_row;
@@ -69,27 +69,27 @@ fn gemv(if ($enable_subgroups) {
   let vec_offset = vec_idx * mat_cols;
 
   // Per-thread result and intermediates.
-  var result: array<dtype, work_per_row>;
-  var intermediate: array<dtype, work_per_col>;
-  var coefficients: array<dtype, work_per_col>;
+  var result: array<dtype, row_work_per_thread>;
+  var coefficient: array<dtype, col_work_per_thread>;
+  var intermediate: array<dtype, col_work_per_thread>;
 
   // Loop over vector.
   for (var block = 0u; block < mat_cols / block_size_col; block++) {
-    let col = lid.x * work_per_col + block * block_size_col;
+    let col = lid.x * col_work_per_thread + block * block_size_col;
     // Load vector.
-    load_unsafe(&coefficients, &vec, vec_offset + col);
+    load_unsafe(&coefficient, &vec, vec_offset + col);
 
     // Work.
-    for (var r = 0u; r < work_per_row; r++) {
+    for (var r = 0u; r < row_work_per_thread; r++) {
       // Load row.
       load_unsafe(&intermediate, &mat, mat_offset + r * mat_cols + col);
 
       // Accumulate results.
-      for (var c = 0u; c < work_per_col; c++) {
+      for (var c = 0u; c < col_work_per_thread; c++) {
         if ($dtype_is_floating) {
-          result[r] = fma(intermediate[c], coefficients[c], result[r]);
+          result[r] = fma(intermediate[c], coefficient[c], result[r]);
         } else {
-          result[r] += intermediate[c] * coefficients[c];
+          result[r] += intermediate[c] * coefficient[c];
         }
       }
     }
@@ -98,21 +98,21 @@ fn gemv(if ($enable_subgroups) {
   // Leftover in cols.
   let leftover = mat_cols % block_size_col;
   if (leftover != 0) {
-    let col = (mat_cols - leftover) + lid.x * work_per_col;
-    load_safe(&coefficients,
+    let col = (mat_cols - leftover) + lid.x * col_work_per_thread;
+    load_safe(&coefficient,
               &vec,
               vec_offset + mat_cols,
               vec_offset + col);
-    for (var r = 0u; r < work_per_row; r++) {
+    for (var r = 0u; r < row_work_per_thread; r++) {
       load_safe(&intermediate,
                 &mat,
                 mat_offset + mat_rows * mat_cols,
                 mat_offset + r * mat_cols + col);
-      for (var c = 0u; c < work_per_col; c++) {
+      for (var c = 0u; c < col_work_per_thread; c++) {
         if ($dtype_is_floating) {
-          result[r] = fma(intermediate[c], coefficients[c], result[r]);
+          result[r] = fma(intermediate[c], coefficient[c], result[r]);
         } else {
-          result[r] += intermediate[c] * coefficients[c];
+          result[r] += intermediate[c] * coefficient[c];
         }
       }
     }
@@ -124,7 +124,7 @@ fn gemv(if ($enable_subgroups) {
     let subgroup_tid = lid.x / subgroup_cols;
 
     // Subgroup accumulations.
-    for (var r = 0u; r < work_per_row; r++) {
+    for (var r = 0u; r < row_work_per_thread; r++) {
       for (var delta = subgroup_cols / 2; delta >= 1; delta >>= 1) {
         result[r] += subgroupShuffleDown(result[r], delta);
       }
@@ -133,16 +133,16 @@ fn gemv(if ($enable_subgroups) {
     if ($needs_workgroup_reduction) {
       // Write first lane's result to shared memory.
       if (lid.x % subgroup_cols == 0) {
-        for (var r = 0u; r < work_per_row; r++) {
-          let idx = (lid.y * work_per_row + r) * workgroup_result_cols + subgroup_tid;
+        for (var r = 0u; r < row_work_per_thread; r++) {
+          let idx = (lid.y * row_work_per_thread + r) * workgroup_result_cols + subgroup_tid;
           workgroup_result[idx] = result[r];
         }
       }
 
       // Workgroup accumulations.
       workgroupBarrier();
-      for (var r = 0u; r < work_per_row; r++) {
-        let idx = (lid.y * work_per_row + r) * workgroup_result_cols + subgroup_tid;
+      for (var r = 0u; r < row_work_per_thread; r++) {
+        let idx = (lid.y * row_work_per_thread + r) * workgroup_result_cols + subgroup_tid;
         let num_subgroups = workgroup_size_col / subgroup_cols;
         for (var delta = num_subgroups / 2; delta >= 1; delta >>= 1) {
           if (lid.x % subgroup_cols == 0 && subgroup_tid < delta) {
@@ -154,15 +154,15 @@ fn gemv(if ($enable_subgroups) {
     }
   } else {
     // Write to shared memory.
-    for (var r = 0u; r < work_per_row; r++) {
-      let idx = (lid.y * work_per_row + r) * workgroup_size_col + lid.x;
+    for (var r = 0u; r < row_work_per_thread; r++) {
+      let idx = (lid.y * row_work_per_thread + r) * workgroup_size_col + lid.x;
       workgroup_result[idx] = result[r];
     }
 
     // Workgroup accumulations.
     workgroupBarrier();
-    for (var r = 0u; r < work_per_row; r++) {
-      let idx = (lid.y * work_per_row + r) * workgroup_size_col + lid.x;
+    for (var r = 0u; r < row_work_per_thread; r++) {
+      let idx = (lid.y * row_work_per_thread + r) * workgroup_size_col + lid.x;
       for (var delta = workgroup_size_col / 2; delta >= 1; delta >>= 1) {
         if (lid.x < delta) {
           workgroup_result[idx] += workgroup_result[idx + delta];
@@ -176,10 +176,10 @@ fn gemv(if ($enable_subgroups) {
   if (lid.x != 0 || out_row >= mat_rows) {
     return;
   }
-  for (var r = 0u; r < work_per_row; r++) {
+  for (var r = 0u; r < row_work_per_thread; r++) {
     if (out_row + r < mat_rows) {
       if ($needs_workgroup_reduction) {
-        let idx = (lid.y * work_per_row + r) * workgroup_result_cols;
+        let idx = (lid.y * row_work_per_thread + r) * workgroup_result_cols;
         out[out_offset + r] = workgroup_result[idx];
       } else {
         out[out_offset + r] = result[r];
@@ -188,19 +188,19 @@ fn gemv(if ($enable_subgroups) {
   }
 }
 
-fn load_unsafe(dst: ptr<function, array<dtype, work_per_col>>,
+fn load_unsafe(dst: ptr<function, array<dtype, col_work_per_thread>>,
                src: ptr<storage, array<dtype>>,
                offset: u32) {
-  for (var i = 0u; i < work_per_col; i++) {
+  for (var i = 0u; i < col_work_per_thread; i++) {
     dst[i] = src[offset + i];
   }
 }
 
-fn load_safe(dst: ptr<function, array<dtype, work_per_col>>,
+fn load_safe(dst: ptr<function, array<dtype, col_work_per_thread>>,
              src: ptr<storage, array<dtype>>,
              src_size: u32,
              offset: u32) {
-  for (var i = 0u; i < work_per_col; i++) {
+  for (var i = 0u; i < col_work_per_thread; i++) {
     dst[i] = select(0, src[offset + i], offset + i < src_size);
   }
 }

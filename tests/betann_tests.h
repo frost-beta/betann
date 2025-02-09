@@ -21,7 +21,7 @@ class BetaNNTests : public testing::Test {
 
   template<typename T>
   std::vector<T> RandomNumbers(size_t size, int upper = 8964) {
-    std::uniform_int_distribution<int32_t> dist(1, upper);
+    std::uniform_int_distribution<int32_t> dist(2, upper);
     std::vector<T> ret;
     for (size_t i = 0; i < size; ++i)
       ret.push_back(static_cast<T>(dist(mt_)));

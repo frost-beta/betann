@@ -39,6 +39,7 @@ set(BETANN_WGSL_SOURCES betann/wgsl/arange.wgsl
                         betann/wgsl/copy_general.wgsl
                         betann/wgsl/copy_general_both.wgsl
                         betann/wgsl/gemv.wgsl
+                        betann/wgsl/gemvt.wgsl
                         betann/wgsl/random.wgsl
                         betann/wgsl/sort_block.wgsl
                         betann/wgsl/unary_contiguous.wgsl
