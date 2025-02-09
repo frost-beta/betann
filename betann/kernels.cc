@@ -132,12 +132,14 @@ void BinaryOpGeneral(Device& device,
                      const char* name,
                      DataType outputDataType,
                      const wgpu::Buffer& output,
-                     const std::vector<uint32_t>& shape,
+                     const std::vector<uint32_t>& shapePre,
                      DataType inputDataType,
                      const wgpu::Buffer& a,
-                     const std::vector<uint32_t>& aStrides,
+                     const std::vector<uint32_t>& aStridesPre,
                      const wgpu::Buffer& b,
-                     const std::vector<uint32_t>& bStrides) {
+                     const std::vector<uint32_t>& bStridesPre) {
+  auto [shape, aStrides, bStrides] =
+      CollapseContiguousDims(shapePre, aStridesPre, bStridesPre);
   const uint32_t workPerThread = 2;
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
   RunKernel(device,
@@ -218,8 +220,10 @@ void CopyGeneral(Device& device,
                  const wgpu::Buffer& dst,
                  DataType srcDataType,
                  const wgpu::Buffer& src,
-                 const std::vector<uint32_t>& srcShape,
-                 const std::vector<uint32_t>& srcStrides) {
+                 const std::vector<uint32_t>& srcShapePre,
+                 const std::vector<uint32_t>& srcStridesPre) {
+  auto [srcShape, srcStrides] =
+      CollapseContiguousDims(srcShapePre, srcStridesPre);
   const uint32_t workPerThread = 2;
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
   RunKernel(device,
@@ -254,11 +258,13 @@ void CopyGeneral(Device& device,
 void CopyGeneralBoth(Device& device,
                      DataType dstDataType,
                      const wgpu::Buffer& dst,
-                     const std::vector<uint32_t>& dstStrides,
+                     const std::vector<uint32_t>& dstStridesPre,
                      DataType srcDataType,
                      const wgpu::Buffer& src,
-                     const std::vector<uint32_t>& srcShape,
-                     const std::vector<uint32_t>& srcStrides) {
+                     const std::vector<uint32_t>& srcShapePre,
+                     const std::vector<uint32_t>& srcStridesPre) {
+  auto [srcShape, srcStrides, dstStrides] =
+      CollapseContiguousDims(srcShapePre, srcStridesPre, dstStridesPre);
   const uint32_t workPerThread = 2;
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
   RunKernel(device,
@@ -477,8 +483,10 @@ void UnaryOpGeneral(Device& device,
                     const wgpu::Buffer& output,
                     DataType inputDataType,
                     const wgpu::Buffer& input,
-                    const std::vector<uint32_t>& inputShape,
-                    const std::vector<uint32_t>& inputStrides) {
+                    const std::vector<uint32_t>& inputShapePre,
+                    const std::vector<uint32_t>& inputStridesPre) {
+  auto [inputShape, inputStrides] =
+      CollapseContiguousDims(inputShapePre, inputStridesPre);
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
   RunKernel(device,
             fmt::format("unary_g_{}", name),

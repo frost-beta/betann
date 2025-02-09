@@ -2,8 +2,9 @@
 
 #include <fmt/format.h>
 
-#include "betann/preprocessor.h"
+#include "betann/kernels.h"
 #include "betann/kernels_helper.h"
+#include "betann/preprocessor.h"
 #include "wgsl_sources.h"
 
 namespace betann {
@@ -115,6 +116,24 @@ void MatrixVectorMultiply(Device& device,
               1,
               NumElements(batchShape),
             });
+}
+
+void MatrixMultipy(Device& device,
+                   DataType dataType,
+                   const wgpu::Buffer& out,
+                   const wgpu::Buffer& a,
+                   const std::vector<uint32_t>& aShape,
+                   const std::vector<uint32_t>& aStrides,
+                   const wgpu::Buffer& b,
+                   const std::vector<uint32_t>& bShape,
+                   const std::vector<uint32_t>& bStrides) {
+  // Return 0s if either input is empty.
+  if (a.GetSize() == 0 || b.GetSize() == 0) {
+    CopyContiguous(device, CopyType::Scalar,
+                   dataType, out, out.GetSize() / SizeOf(dataType),
+                   DataType::u32, device.CreateBufferFromScalar(0u));
+    return;
+  }
 }
 
 }  // namespace betann

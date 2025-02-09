@@ -83,6 +83,17 @@ void CopyGeneralBoth(Device& device,
                      const std::vector<uint32_t>& srcShape,
                      const std::vector<uint32_t>& srcStrides);
 
+// Multiply contiguous matrix.
+void MatrixMultipy(Device& device,
+                   DataType dataType,
+                   const wgpu::Buffer& out,
+                   const wgpu::Buffer& a,
+                   const std::vector<uint32_t>& aShape,
+                   const std::vector<uint32_t>& aStrides,
+                   const wgpu::Buffer& b,
+                   const std::vector<uint32_t>& bShape,
+                   const std::vector<uint32_t>& bStrides);
+
 // Generate random bits from contiguous keys.
 void RandomBitsContiguous(Device& device,
                           DataType outDataType,

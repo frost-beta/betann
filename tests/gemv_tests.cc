@@ -2,6 +2,8 @@
 
 #include <fmt/format.h>
 
+#include "betann/matmul.h"
+
 class MatrixVectorMultiplyTests : public BetaNNTests {
  public:
   template<typename T>

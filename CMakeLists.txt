@@ -15,6 +15,7 @@ target_sources(betann PRIVATE betann/device.cc
                               betann/math.cc
                               betann/matmul.cc
                               betann/preprocessor.cc
+                              betann/utils.cc
                       PUBLIC FILE_SET HEADERS
                              BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
                              FILES betann/betann.h
