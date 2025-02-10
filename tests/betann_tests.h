@@ -51,4 +51,7 @@ class BetaNNTests : public testing::Test {
 
  private:
   std::mt19937 mt_;
+
+  // Disable the CollapseContiguousDims optimization to accurately test kernels.
+  betann::DisableCollapseDims disable_collapse_dims_;
 };

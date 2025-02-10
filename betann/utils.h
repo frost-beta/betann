@@ -81,19 +81,20 @@ inline uint32_t NumElements(const std::vector<uint32_t>& shape,
 
 std::tuple<std::vector<uint32_t>,
            std::vector<std::vector<uint32_t>>>
-CollapseContiguousDimsImpl(const std::vector<uint32_t>& shape,
-                           const std::vector<std::vector<uint32_t>>& strides,
-                           int64_t sizeCap = INT_MAX);
-std::tuple<std::vector<uint32_t>,
-           std::vector<uint32_t>>
-CollapseContiguousDimsImpl(const std::vector<uint32_t>& shape,
-                           const std::vector<uint32_t>& strides,
-                           int64_t sizeCap = INT_MAX);
+CollapseContiguousDims(const std::vector<uint32_t>& shape,
+                       const std::vector<std::vector<uint32_t>>& strides,
+                       int64_t sizeCap = INT_MAX);
 
 template<typename T, typename V, size_t... Is>
 auto VectorToTuple(T first, V vec, std::index_sequence<Is...>) {
     return std::make_tuple(std::move(first), std::move(vec[Is])...);
 }
+
+struct DisableCollapseDims {
+  DisableCollapseDims() { isDisabled = true; }
+  ~DisableCollapseDims() { isDisabled = false; }
+  static bool isDisabled;
+};
 
 // Collapse dims that are contiguous to possibly route to a better kernel.
 // e.g. for x = transpose(array({0, 1, 2, 3, 4, 5, 6, 7}, {2, 2, 2}), {2, 0, 1})
@@ -105,14 +106,12 @@ template<typename... Args>
 inline std::tuple<std::vector<uint32_t>, Args...> CollapseContiguousDims(
     const std::vector<uint32_t>& shape,
     const Args&... args) {
-  if constexpr (sizeof...(Args) == 1) {
-    return CollapseContiguousDimsImpl(shape, args...);
-  } else {
-    auto [outShape, outStrides] = CollapseContiguousDimsImpl(shape, {args...});
-    return VectorToTuple(std::move(outShape),
-                         std::move(outStrides),
-                         std::make_index_sequence<sizeof...(Args)>());
-  }
+  if (DisableCollapseDims::isDisabled)
+    return {shape, args...};
+  auto [outShape, outStrides] = CollapseContiguousDims(shape, {args...});
+  return VectorToTuple(std::move(outShape),
+                       std::move(outStrides),
+                       std::make_index_sequence<sizeof...(Args)>());
 }
 
 }  // namespace betann

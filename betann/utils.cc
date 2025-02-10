@@ -22,11 +22,14 @@
 
 namespace betann {
 
+// static
+bool DisableCollapseDims::isDisabled = false;
+
 std::tuple<std::vector<uint32_t>,
            std::vector<std::vector<uint32_t>>>
-CollapseContiguousDimsImpl(const std::vector<uint32_t>& shape,
-                           const std::vector<std::vector<uint32_t>>& strides,
-                           int64_t sizeCap) {
+CollapseContiguousDims(const std::vector<uint32_t>& shape,
+                       const std::vector<std::vector<uint32_t>>& strides,
+                       int64_t sizeCap) {
   // Make a vector that has axes separated with -1. Collapse all axes between
   // -1.
   std::vector<int64_t> toCollapse;
@@ -84,34 +87,6 @@ CollapseContiguousDimsImpl(const std::vector<uint32_t>& shape,
     }
   }
   return {std::move(outShape), std::move(outStrides)};
-}
-
-std::tuple<std::vector<uint32_t>,
-           std::vector<uint32_t>>
-CollapseContiguousDimsImpl(const std::vector<uint32_t>& shape,
-                           const std::vector<uint32_t>& strides,
-                           int64_t sizeCap) {
-  std::vector<uint32_t> collapsedShape;
-  std::vector<uint32_t> collapsedStrides;
-
-  if (shape.size() > 0) {
-    collapsedShape.push_back(shape[0]);
-    collapsedStrides.push_back(strides[0]);
-    for (size_t i = 1; i < shape.size(); i++) {
-      if (shape[i] == 1) {
-        continue;
-      } else if (strides[i] * shape[i] != collapsedStrides.back() ||
-                 collapsedShape.back() * shape[i] > sizeCap) {
-        collapsedShape.push_back(shape[i]);
-        collapsedStrides.push_back(strides[i]);
-      } else {
-        collapsedShape.back() *= shape[i];
-        collapsedStrides.back() = strides[i];
-      }
-    }
-  }
-
-  return {std::move(collapsedShape), std::move(collapsedStrides)};
 }
 
 }  // namespace betann
