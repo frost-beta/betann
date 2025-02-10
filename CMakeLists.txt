@@ -29,6 +29,8 @@ target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURC
                                   PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/gen")
 if (CMAKE_COMPILER_IS_GNUCC)
   target_compile_options(betann PUBLIC -Wno-return-type)
+elseif (MSVC)
+  target_compile_options(betann PUBLIC /wd4244 /wd4715)
 endif()
 
 # Embed WGSL sources in binary.

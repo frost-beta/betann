@@ -73,7 +73,9 @@ TEST_F(UnaryTests, Contiguous) {
             (std::vector<int32_t>{8, 7, 6}));
   auto a = RandomNumbers<int32_t>(1000);
   EXPECT_EQ(RunUnaryOpsContiguous<int32_t>("sqrt", a),
-            Map(a, [](int32_t i) { return std::sqrt(static_cast<float>(i)); }));
+            Map(a, [](int32_t i) {
+              return static_cast<int32_t>(std::sqrt(static_cast<float>(i)));
+            }));
 }
 
 TEST_F(UnaryTests, General) {
