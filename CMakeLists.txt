@@ -82,11 +82,15 @@ FetchContent_Declare(
 set(DAWN_FETCH_DEPENDENCIES ON)
 set(DAWN_USE_GLFW OFF)
 set(DAWN_USE_X11 OFF)
-set(DAWN_USE_WINDOWS_UI OFF)
 set(DAWN_BUILD_SAMPLES OFF)
 set(DAWN_BUILD_MONOLITHIC_LIBRARY OFF)
 set(TINT_BUILD_CMD_TOOLS OFF)
 set(TINT_BUILD_TESTS OFF)
+if (WIN32)
+  set(DAWN_ENABLE_SPIRV_VALIDATION OFF)
+  set(DAWN_ENABLE_VULKAN OFF)  # TODO(zcbenz): enable it and ship vulkan-1.dll
+  set(DAWN_USE_WINDOWS_UI OFF)
+endif()
 FetchContent_MakeAvailable(dawn)
 target_link_libraries(betann PUBLIC $<BUILD_INTERFACE:dawncpp_headers>
                              PRIVATE $<LINK_ONLY:dawn::dawn_common>
