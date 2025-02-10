@@ -117,6 +117,7 @@ if (BETANN_BUILD_TESTS)
                               tests/binary_tests.cc
                               tests/copy_tests.cc
                               tests/gemv_tests.cc
+                              tests/matmul_tests.cc
                               tests/random_tests.cc
                               tests/sort_tests.cc
                               tests/unary_tests.cc)
