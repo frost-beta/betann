@@ -22,8 +22,8 @@ Dims GetDims(const std::vector<uint32_t>& shape) {
   dims.ndim = shape.size();
   dims.dim0 = dims.ndim > 0 ? shape[dims.ndim - 1] : 1;
   dims.dim1 = dims.ndim > 1 ? shape[dims.ndim - 2] : 1;
-  if (dims.ndim >= 3) {
-    for (int d = static_cast<int>(dims.ndim - 3); d >= 0; d--)
+  if (dims.ndim > 2) {
+    for (uint32_t d = 0; d < dims.ndim - 2; d++)
       dims.rest *= shape[d];
   }
   return dims;
@@ -145,6 +145,8 @@ void BinaryOpGeneral(Device& device,
                      const std::vector<uint32_t>& bStridesPre) {
   auto [shape, aStrides, bStrides] =
       CollapseContiguousDims(shapePre, aStridesPre, bStridesPre);
+  if (shape.size() < 2)
+    throw std::runtime_error("BinaryOpGeneral do not take contiguous inputs.");
   const uint32_t workPerThread = 2;
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
   RunKernel(device,
@@ -229,6 +231,8 @@ void CopyGeneral(Device& device,
                  const std::vector<uint32_t>& srcStridesPre) {
   auto [srcShape, srcStrides] =
       CollapseContiguousDims(srcShapePre, srcStridesPre);
+  if (srcShape.size() < 2)
+    throw std::runtime_error("CopyGeneral do not take contiguous inputs.");
   const uint32_t workPerThread = 2;
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
   RunKernel(device,
@@ -270,6 +274,8 @@ void CopyGeneralBoth(Device& device,
                      const std::vector<uint32_t>& srcStridesPre) {
   auto [srcShape, srcStrides, dstStrides] =
       CollapseContiguousDims(srcShapePre, srcStridesPre, dstStridesPre);
+  if (srcShape.size() < 2)
+    throw std::runtime_error("CopyGeneralBoth do not take contiguous inputs.");
   const uint32_t workPerThread = 2;
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
   RunKernel(device,
@@ -493,6 +499,8 @@ void UnaryOpGeneral(Device& device,
                     const std::vector<uint32_t>& inputStridesPre) {
   auto [inputShape, inputStrides] =
       CollapseContiguousDims(inputShapePre, inputStridesPre);
+  if (inputShape.size() < 2)
+    throw std::runtime_error("UnaryOpGeneral do not take contiguous inputs.");
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
   RunKernel(device,
             fmt::format("unary_g_{}", name),

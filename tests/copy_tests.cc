@@ -103,6 +103,9 @@ TEST_F(CopyTests, GeneralContiguous) {
   auto src = RandomNumbers<int32_t>(64);
   auto dst = RunCopyGeneral<int32_t>(src, {4, 4, 4}, {16, 4, 1});
   EXPECT_EQ(dst, src);
+  EXPECT_THROW({
+    RunCopyGeneral<float>(RandomNumbers<int32_t>(1000), {1000}, {1});
+  }, std::runtime_error);
 }
 
 TEST_F(CopyTests, GeneralNonContiguous) {

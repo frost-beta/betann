@@ -98,11 +98,11 @@ TEST_F(BinaryTests, LargeArrays) {
 TEST_F(BinaryTests, GeneralContiguous) {
   std::vector<float> con1d = RunBinaryOpGeneral<float, float>(
       "subtract",
-      {3},
+      {1, 3},
       {1, 2, 3},
-      {1},
+      {0, 1},
       {0.1, 0.2, 0.3},
-      {1});
+      {0, 1});
   EXPECT_EQ(con1d, std::vector<float>({0.9, 1.8, 2.7}));
   std::vector<int32_t> con2d = RunBinaryOpGeneral<int32_t, int32_t>(
       "multiply",
@@ -128,11 +128,11 @@ TEST_F(BinaryTests, GeneralContiguous) {
 TEST_F(BinaryTests, GeneralNonContiguous) {
   std::vector<float> noc1d = RunBinaryOpGeneral<float, float>(
       "multiply",
-      {2},
+      {1, 2},
       {1, 2, 3, 4},
+      {0, 2},
       {2},
-      {2},
-      {0});
+      {0, 0});
   EXPECT_EQ(noc1d, std::vector<float>({2, 6}));
   std::vector<float> noc2d = RunBinaryOpGeneral<float, float>(
       "add",
@@ -158,7 +158,7 @@ TEST_F(BinaryTests, GeneralLargeArrays) {
   uint32_t outputNumElements = betann::NumElements(shape);
   std::vector<float> a(outputNumElements, 8);
   std::vector<float> b(outputNumElements, 8);
-  std::vector<uint32_t> c = RunBinaryOpGeneral<uint32_t, float>(
+  auto c = RunBinaryOpGeneral<uint32_t, float>(
       "multiply", shape, a, strides, b, strides);
   EXPECT_EQ(c, std::vector<uint32_t>(c.size(), 64));
 }

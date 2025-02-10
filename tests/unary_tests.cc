@@ -90,4 +90,7 @@ TEST_F(UnaryTests, General) {
                                         {2, 5, 10, 10},
                                         {500, 100, 10, 1}),
             Map(a, [](int32_t i) { return i * i; }));
+  EXPECT_THROW({
+    RunUnaryOpsGeneral<int32_t>("negative", a, {1000}, {1});
+  }, std::runtime_error);
 }
