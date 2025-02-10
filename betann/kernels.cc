@@ -22,7 +22,7 @@ Dims GetDims(const std::vector<uint32_t>& shape) {
   dims.ndim = shape.size();
   dims.dim0 = dims.ndim > 0 ? shape[dims.ndim - 1] : 1;
   dims.dim1 = dims.ndim > 1 ? shape[dims.ndim - 2] : 1;
-  if (dims.ndim > 3) {
+  if (dims.ndim >= 3) {
     for (int d = static_cast<int>(dims.ndim - 3); d >= 0; d--)
       dims.rest *= shape[d];
   }
@@ -456,7 +456,8 @@ void UnaryOpContiguous(Device& device,
                          inputDataType == DataType::i32;
   RunKernel(device,
             fmt::format("unary_{}_{}", use2DGrid ? "v2" : "v", name),
-            fmt::format("unary_{}_{}",
+            fmt::format("unary_{}_{}_{}",
+                        name,
                         WgslType(outputDataType),
                         WgslType(inputDataType)),
             [&]() {
