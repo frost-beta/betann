@@ -79,16 +79,30 @@ inline uint32_t NumElements(const std::vector<uint32_t>& shape,
   return offset + 1;
 }
 
-std::tuple<std::vector<uint32_t>,
-           std::vector<std::vector<uint32_t>>>
-CollapseContiguousDims(const std::vector<uint32_t>& shape,
-                       const std::vector<std::vector<uint32_t>>& strides,
-                       int64_t sizeCap = INT_MAX);
+// Slice a vector.
+template<typename T>
+inline std::vector<T> Slice(const std::vector<T>& vec,
+                            int start = 0,
+                            int end = -1) {
+  if (start < 0)
+    start += static_cast<int>(vec.size());
+  if (end < 0)
+    end += static_cast<int>(vec.size());
+  if (start >= vec.size() || end > vec.size())
+    return {};
+  return std::vector<T>(vec.begin() + start, vec.begin() + end);
+}
 
 template<typename T, typename V, size_t... Is>
 auto VectorToTuple(T first, V vec, std::index_sequence<Is...>) {
     return std::make_tuple(std::move(first), std::move(vec[Is])...);
 }
+
+std::tuple<std::vector<uint32_t>,
+           std::vector<std::vector<uint32_t>>>
+CollapseContiguousDims(const std::vector<uint32_t>& shape,
+                       const std::vector<std::vector<uint32_t>>& strides,
+                       int64_t sizeCap = INT_MAX);
 
 struct DisableCollapseDims {
   DisableCollapseDims() { isDisabled = true; }

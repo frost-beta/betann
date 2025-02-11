@@ -194,15 +194,14 @@ void MatrixMultiply(Device& device,
   }
 
   // Collapse batch dimensions.
-  std::vector<uint32_t> aBatchShape(aShape.begin(), aShape.end() - 2);
-  std::vector<uint32_t> bBatchShape(bShape.begin(), bShape.end() - 2);
+  std::vector<uint32_t> aBatchShape = Slice(aShape, 0, -2);
+  std::vector<uint32_t> bBatchShape = Slice(bShape, 0, -2);
   if (aBatchShape != bBatchShape)
     throw std::runtime_error("Matrices have incorrectly broadcasted shapes.");
   auto [batchShape, aBatchStrides, bBatchStrides] =
-      CollapseContiguousDims(
-          aBatchShape,
-          std::vector<uint32_t>(aStrides.begin(), aStrides.end() -2),
-          std::vector<uint32_t>(bStrides.begin(), bStrides.end() -2));
+      CollapseContiguousDims(aBatchShape,
+                             Slice(aStrides, 0, -2),
+                             Slice(bStrides, 0, -2));
   if (batchShape.empty()) {
     batchShape = {1};
     aBatchStrides = bBatchStrides = {0};

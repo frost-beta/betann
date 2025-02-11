@@ -29,6 +29,50 @@ class BetaNNTests : public testing::Test {
   }
 
   template<typename T>
+  std::vector<T> CpuMatmul(const std::vector<T>& a,
+                           const std::vector<uint32_t>& aShape,
+                           const std::vector<uint32_t>& aStrides,
+                           const std::vector<T>& b,
+                           const std::vector<uint32_t>& bShape,
+                           const std::vector<uint32_t>& bStrides) {
+    uint32_t batchSize = 1;
+    for (size_t i = 0; i < aShape.size() - 2; ++i) {
+      batchSize *= aShape[i];
+    }
+    uint32_t m = aShape[aShape.size() - 2];
+    uint32_t n = bShape[bShape.size() - 1];
+    uint32_t k = aShape[aShape.size() - 1];
+    std::vector<T> result(batchSize * m * n, 0);
+    for (uint32_t batch = 0; batch < batchSize; ++batch) {
+      for (uint32_t i = 0; i < m; ++i) {
+        for (uint32_t j = 0; j < n; ++j) {
+          T temp = 0;
+          for (uint32_t l = 0; l < k; ++l) {
+            uint32_t aIndex = 0;
+            uint32_t bIndex = 0;
+            for (int batchIndex = batch, dim = aShape.size() - 3;
+                 dim >= 0 && batchIndex > 0;
+                 dim--) {
+              uint32_t dimIndex = batchIndex % aShape[dim];
+              aIndex += dimIndex * aStrides[dim];
+              bIndex += dimIndex * bStrides[dim];
+              batchIndex /= aShape[dim];
+            }
+            aIndex += i * aStrides[aShape.size() - 2] +
+                      l * aStrides[aShape.size() - 1];
+            bIndex += l * bStrides[bShape.size() - 2] +
+                      j * bStrides[bShape.size() - 1];
+            temp += a[aIndex] * b[bIndex];
+          }
+          uint32_t resultIndex = batch * m * n + i * n + j;
+          result[resultIndex] = temp;
+        }
+      }
+    }
+    return result;
+  }
+
+  template<typename T>
   std::vector<T> Iota(size_t size, T start) {
     std::vector<T> a(size);
     std::iota(a.begin(), a.end(), start);

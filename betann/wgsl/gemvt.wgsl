@@ -55,14 +55,12 @@ fn gemvt(@builtin(workgroup_id) tid: vec3<u32>,
   // Offset of current batch.
   let out_offset = tid.z * mat_cols + out_col;
   if ($contiguous) {
-    let mat_idx = tid.z;
-    let vec_idx = tid.z;
+    let mat_offset = tid.z * mat_rows * mat_cols;
+    let vec_offset = tid.z * mat_rows;
   } else {
-    let mat_idx = coord_to_index(tid.z, &batch_shape, &batch_strides_mat);
-    let vec_idx = coord_to_index(tid.z, &batch_shape, &batch_strides_vec);
+    let mat_offset = coord_to_index(tid.z, &batch_shape, &batch_strides_mat);
+    let vec_offset = coord_to_index(tid.z, &batch_shape, &batch_strides_vec);
   }
-  let mat_offset = mat_idx * mat_rows * mat_cols;
-  let vec_offset = vec_idx * mat_rows;
 
   // Per-thread result and intermediates.
   var result: array<dtype, col_work_per_thread>;
