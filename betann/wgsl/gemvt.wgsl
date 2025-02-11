@@ -29,11 +29,11 @@ const cols_per_workgroup = col_work_per_thread * group_cols * group_count;
 @group(0) @binding(1) var<storage, read> mat: array<dtype>;
 @group(0) @binding(2) var<uniform> mat_rows: u32;
 @group(0) @binding(3) var<uniform> mat_cols: u32;
-@group(0) @binding(4) var<storage, read> vec: array<dtype>;
+@group(0) @binding(4) var<storage, read> batch_strides_mat: array<u32>;
+@group(0) @binding(5) var<storage, read> vec: array<dtype>;
+@group(0) @binding(6) var<storage, read> batch_strides_vec: array<u32>;
 if (!$contiguous) {
-  @group(0) @binding(5) var<storage, read> batch_shape: array<u32>;
-  @group(0) @binding(6) var<storage, read> batch_strides_mat: array<u32>;
-  @group(0) @binding(7) var<storage, read> batch_strides_vec: array<u32>;
+  @group(0) @binding(7) var<storage, read> batch_shape: array<u32>;
 }
 
 if (!$enable_subgroups) {
@@ -55,8 +55,8 @@ fn gemvt(@builtin(workgroup_id) tid: vec3<u32>,
   // Offset of current batch.
   let out_offset = tid.z * mat_cols + out_col;
   if ($contiguous) {
-    let mat_offset = tid.z * mat_rows * mat_cols;
-    let vec_offset = tid.z * mat_rows;
+    let mat_offset = tid.z * batch_strides_mat[0];
+    let vec_offset = tid.z * batch_strides_vec[0];
   } else {
     let mat_offset = coord_to_index(tid.z, &batch_shape, &batch_strides_mat);
     let vec_offset = coord_to_index(tid.z, &batch_shape, &batch_strides_vec);

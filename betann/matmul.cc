@@ -22,12 +22,15 @@ bool IsTranposed(const std::vector<uint32_t>& shape,
 bool NeedsContiguousCopy(const std::vector<uint32_t>& shape,
                          const std::vector<uint32_t>& strides,
                          bool isMatrixVector) {
-  auto stx = strides[strides.size()] - 2;
-  auto sty = strides[strides.size()] - 1;
-  if (!isMatrixVector)  // the gemm kernel supports non-contiguous kernel
-    return stx == 1 || sty == 1;
-  return (stx == 1 && sty == shape[shape.size() - 2]) ||
-         (sty == 1 && stx == shape[shape.size() - 1]);
+  auto stx = strides[strides.size() - 2];
+  auto sty = strides[strides.size() - 1];
+  if (!isMatrixVector && (stx == 1 || sty == 1))
+    return false;  // the gemm kernel supports non-contiguous vector
+  if (stx == 1 && sty == shape[shape.size() - 2])
+    return false;
+  if (sty == 1 && stx == shape[shape.size() - 1])
+    return false;
+  return true;
 }
 
 wgpu::Buffer CopyArray(Device& device,
@@ -36,7 +39,7 @@ wgpu::Buffer CopyArray(Device& device,
                        const std::vector<uint32_t>& shape,
                        const std::vector<uint32_t>& strides) {
   wgpu::Buffer dst = device.CreateBuffer(
-      NumElements(shape, strides) * SizeOf(dataType),
+      NumElements(shape) * SizeOf(dataType),
       wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
   CopyGeneral(device, dataType, dst, dataType, src, shape, strides);
   return dst;
@@ -92,19 +95,7 @@ void MatrixVectorMultiply(Device& device,
     colWorkPerThread = 4;
   }
 
-  std::vector<wgpu::Buffer> args = {
-      out,
-      mat,
-      device.CreateBufferFromScalar(matRows),
-      device.CreateBufferFromScalar(matCols),
-      vec,
-  };
   const bool contiguous = batchShape.size() < 2;
-  if (!contiguous) {
-    args.push_back(device.CreateBufferFromVector(batchShape));
-    args.push_back(device.CreateBufferFromVector(batchStridesMat));
-    args.push_back(device.CreateBufferFromVector(batchStridesVec));
-  }
   RunKernel(device,
             matTranspose ? "gemvt" : "gemv",
             fmt::format("gemv_{}_{}_{}_{}_{}_{}_{}_{}_{}",
@@ -143,7 +134,16 @@ void MatrixVectorMultiply(Device& device,
                       }),
                   wgsl_source_utils);
             },
-            args,
+            {
+              out,
+              mat,
+              device.CreateBufferFromScalar(matRows),
+              device.CreateBufferFromScalar(matCols),
+              device.CreateBufferFromVector(batchStridesMat),
+              vec,
+              device.CreateBufferFromVector(batchStridesVec),
+              !contiguous ? device.CreateBufferFromVector(batchShape) : nullptr,
+            },
             {
               matTranspose
                   ? DivCeil(matCols, colWorkPerThread * groupCount * groupCols)
@@ -188,7 +188,7 @@ void MatrixMultiply(Device& device,
   }
   if (NeedsContiguousCopy(bShape, bStrides, isMatrixVector)) {
     bTransposed = false;
-    b = CopyArray(device, dataType, b, aShape, aStrides);
+    b = CopyArray(device, dataType, b, bShape, bStrides);
   } else {
     bTransposed = IsTranposed(bShape, bStrides, isMatrixVector);
   }

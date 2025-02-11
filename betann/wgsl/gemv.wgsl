@@ -23,11 +23,11 @@ const workgroup_size_col: u32 = 32;
 @group(0) @binding(1) var<storage, read> mat: array<dtype>;
 @group(0) @binding(2) var<uniform> mat_rows: u32;
 @group(0) @binding(3) var<uniform> mat_cols: u32;
-@group(0) @binding(4) var<storage, read> vec: array<dtype>;
+@group(0) @binding(4) var<storage, read> batch_strides_mat: array<u32>;
+@group(0) @binding(5) var<storage, read> vec: array<dtype>;
+@group(0) @binding(6) var<storage, read> batch_strides_vec: array<u32>;
 if (!$contiguous) {
-  @group(0) @binding(5) var<storage, read> batch_shape: array<u32>;
-  @group(0) @binding(6) var<storage, read> batch_strides_mat: array<u32>;
-  @group(0) @binding(7) var<storage, read> batch_strides_vec: array<u32>;
+  @group(0) @binding(7) var<storage, read> batch_shape: array<u32>;
 }
 
 // The workgroup_result collects results from each thread.
@@ -59,8 +59,8 @@ fn gemv(if ($enable_subgroups) {
   // Offset of current batch.
   let out_offset = tid.z * mat_rows + out_row;
   if ($contiguous) {
-    var mat_offset = tid.z * mat_rows * mat_cols;
-    let vec_offset = tid.z * mat_cols;
+    var mat_offset = tid.z * batch_strides_mat[0];
+    let vec_offset = tid.z * batch_strides_vec[0];
   } else {
     var mat_offset = coord_to_index(tid.z, &batch_shape, &batch_strides_mat);
     let vec_offset = coord_to_index(tid.z, &batch_shape, &batch_strides_vec);

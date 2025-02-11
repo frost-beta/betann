@@ -33,42 +33,116 @@ class MatrixMultiplyTest : public BetaNNTests {
 
 };
 
-TEST_F(MatrixMultiplyTest, GEMV) {
-  auto a = RandomNumbers<float>(16, 10);
+TEST_F(MatrixMultiplyTest, GEMVContiguous) {
+  auto a = RandomNumbers<float>(20, 10);
   auto b = RandomNumbers<float>(4, 10);
-  // gemv(a, b)
-  EXPECT_EQ(GpuMatmul(a, {4, 4}, {4, 1},
-                      b, {4, 1}, {1, 0}),
-            CpuMatmul(a, {4, 4}, {4, 1},
-                      b, {4, 1}, {1, 0}));
-  // gemv(b, a)
-  EXPECT_EQ(GpuMatmul(b, {1, 4}, {0, 1},
-                      a, {4, 4}, {4, 1}),
-            CpuMatmul(b, {1, 4}, {0, 1},
-                      a, {4, 4}, {4, 1}));
-  // gemv(a.T, b)
-  EXPECT_EQ(GpuMatmul(a, {4, 4}, {1, 4},
-                      b, {4, 1}, {1, 0}),
-            CpuMatmul(a, {4, 4}, {1, 4},
-                      b, {4, 1}, {1, 0}));
-  // gemv(b, a.T)
-  EXPECT_EQ(GpuMatmul(b, {1, 4}, {0, 1},
-                      a, {4, 4}, {1, 4}),
-            CpuMatmul(b, {1, 4}, {0, 1},
-                      a, {4, 4}, {1, 4}));
+  // matmul(a, b)
+  EXPECT_EQ(GpuMatmul(a, {5, 4}, {4, 1},
+                      b, {4, 1}, {1, 1}),
+            CpuMatmul(a, {5, 4}, {4, 1},
+                      b, {4, 1}, {1, 1}));
+  // matmul(a.T, b)
+  EXPECT_EQ(GpuMatmul(a, {5, 4}, {1, 5},
+                      b, {4, 1}, {1, 4}),
+            CpuMatmul(a, {5, 4}, {1, 5},
+                      b, {4, 1}, {1, 4}));
+  // matmul(b, a)
+  EXPECT_EQ(GpuMatmul(b, {1, 4}, {4, 1},
+                      a, {4, 5}, {5, 1}),
+            CpuMatmul(b, {1, 4}, {4, 1},
+                      a, {4, 5}, {5, 1}));
+  // matmul(b, a.T)
+  EXPECT_EQ(GpuMatmul(b, {1, 4}, {4, 1},
+                      a, {4, 5}, {1, 4}),
+            CpuMatmul(b, {1, 4}, {4, 1},
+                      a, {4, 5}, {1, 4}));
 }
 
-TEST_F(MatrixMultiplyTest, BatchGEMV) {
-  auto a = RandomNumbers<float>(10 * 16, 10);
+TEST_F(MatrixMultiplyTest, GEMVContiguousBatch) {
+  auto a = RandomNumbers<float>(10 * 20, 10);
   auto b = RandomNumbers<float>(10 * 4, 10);
-  // gemv(10, a, b)
-  EXPECT_EQ(GpuMatmul(a, {10, 4, 4}, {16, 4, 1},
-                      b, {10, 4, 1}, {4, 1, 0}),
-            CpuMatmul(a, {10, 4, 4}, {16, 4, 1},
-                      b, {10, 4, 1}, {4, 1, 0}));
-  // gemv(2, 5, a, b)
-  EXPECT_EQ(GpuMatmul(a, {2, 5, 4, 4}, {80, 16, 4, 1},
-                      b, {2, 5, 4, 1}, {20, 4, 1, 0}),
-            CpuMatmul(a, {2, 5, 4, 4}, {80, 16, 4, 1},
-                      b, {2, 5, 4, 1}, {20, 4, 1, 0}));
+  // matmul(10, a, b)
+  EXPECT_EQ(GpuMatmul(a, {10, 5, 4}, {20, 4, 1},
+                      b, {10, 4, 1}, {4, 1, 1}),
+            CpuMatmul(a, {10, 5, 4}, {20, 4, 1},
+                      b, {10, 4, 1}, {4, 1, 1}));
+  // matmul(10, a.T, b)
+  EXPECT_EQ(GpuMatmul(a, {10, 5, 4}, {20, 1, 5},
+                      b, {10, 4, 1}, {4, 1, 1}),
+            CpuMatmul(a, {10, 5, 4}, {20, 1, 5},
+                      b, {10, 4, 1}, {4, 1, 1}));
+  // matmul(10, b, a)
+  EXPECT_EQ(GpuMatmul(b, {10, 1, 4}, {4, 1, 1},
+                      a, {10, 4, 5}, {20, 5, 1}),
+            CpuMatmul(b, {10, 1, 4}, {4, 1, 1},
+                      a, {10, 4, 5}, {20, 5, 1}));
+  // matmul(10, b, a.T)
+  EXPECT_EQ(GpuMatmul(b, {10, 1, 4}, {4, 1, 1},
+                      a, {10, 4, 5}, {20, 1, 4}),
+            CpuMatmul(b, {10, 1, 4}, {4, 1, 1},
+                      a, {10, 4, 5}, {20, 1, 4}));
+  // matmul(2, 5, a, b)
+  EXPECT_EQ(GpuMatmul(a, {2, 5, 5, 4}, {100, 20, 4, 1},
+                      b, {2, 5, 4, 1}, {20, 4, 1, 1}),
+            CpuMatmul(a, {2, 5, 5, 4}, {100, 20, 4, 1},
+                      b, {2, 5, 4, 1}, {20, 4, 1, 1}));
+  // matmul(2, 5, a.T, b)
+  EXPECT_EQ(GpuMatmul(a, {2, 5, 5, 4}, {100, 20, 1, 5},
+                      b, {2, 5, 4, 1}, {20, 4, 1, 1}),
+            CpuMatmul(a, {2, 5, 5, 4}, {100, 20, 1, 5},
+                      b, {2, 5, 4, 1}, {20, 4, 1, 1}));
+  // matmul(2, 5, b, a)
+  EXPECT_EQ(GpuMatmul(b, {2, 5, 1, 4}, {20, 4, 1, 1},
+                      a, {2, 5, 4, 5}, {100, 20, 5, 1}),
+            CpuMatmul(b, {2, 5, 1, 4}, {20, 4, 1, 1},
+                      a, {2, 5, 4, 5}, {100, 20, 5, 1}));
+}
+
+TEST_F(MatrixMultiplyTest, GEMVNonContiguous) {
+  // matmul(a_broadcast, b)
+  auto a = RandomNumbers<float>(4, 10);
+  auto b = RandomNumbers<float>(4, 10);
+  EXPECT_EQ(GpuMatmul(a, {5, 4}, {0, 1},
+                      b, {4, 1}, {1, 1}),
+            CpuMatmul(a, {5, 4}, {0, 1},
+                      b, {4, 1}, {1, 1}));
+  // matmul(a_broadcast, b_broadcast)
+  b = RandomNumbers<float>(1, 10);
+  EXPECT_EQ(GpuMatmul(a, {5, 4}, {0, 1},
+                      b, {4, 1}, {0, 0}),
+            CpuMatmul(a, {5, 4}, {0, 1},
+                      b, {4, 1}, {0, 0}));
+  // matmul(a, b_broadcast)
+  a = RandomNumbers<float>(20, 10);
+  EXPECT_EQ(GpuMatmul(a, {5, 4}, {4, 1},
+                      b, {4, 1}, {0, 0}),
+            CpuMatmul(a, {5, 4}, {4, 1},
+                      b, {4, 1}, {0, 0}));
+}
+
+TEST_F(MatrixMultiplyTest, GEMVNonContiguousBatch) {
+  // matmul(10, a, b)
+  auto a = RandomNumbers<float>(20, 10);
+  auto b = RandomNumbers<float>(4, 10);
+  EXPECT_EQ(GpuMatmul(a, {10, 5, 4}, {0, 4, 1},
+                      b, {10, 4, 1}, {0, 1, 1}),
+            CpuMatmul(a, {10, 5, 4}, {0, 4, 1},
+                      b, {10, 4, 1}, {0, 1, 1}));
+  // matmul(2, 5, a.T, b)
+  a = RandomNumbers<float>(5 * 20, 10);
+  b = RandomNumbers<float>(5 * 4, 10);
+  EXPECT_EQ(GpuMatmul(a, {2, 5, 5, 4}, {0, 20, 1, 5},
+                      b, {2, 5, 4, 1}, {0, 4, 1, 1}),
+            CpuMatmul(a, {2, 5, 5, 4}, {0, 20, 1, 5},
+                      b, {2, 5, 4, 1}, {0, 4, 1, 1}));
+  // matmul(2, 5, b, a)
+  EXPECT_EQ(GpuMatmul(b, {2, 5, 1, 4}, {0, 4, 1, 1},
+                      a, {2, 5, 4, 5}, {0, 20, 5, 1}),
+            CpuMatmul(b, {2, 5, 1, 4}, {0, 4, 1, 1},
+                      a, {2, 5, 4, 5}, {0, 20, 5, 1}));
+  // matmul(2, 5, b, a.T)
+  EXPECT_EQ(GpuMatmul(b, {2, 5, 1, 4}, {0, 4, 1, 1},
+                      a, {2, 5, 4, 5}, {0, 20, 1, 4}),
+            CpuMatmul(b, {2, 5, 1, 4}, {0, 4, 1, 1},
+                      a, {2, 5, 4, 5}, {0, 20, 1, 4}));
 }
