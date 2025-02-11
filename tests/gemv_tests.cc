@@ -9,10 +9,10 @@ class MatrixVectorMultiplyTests : public BetaNNTests {
   template<typename T>
   std::vector<T> GpuGemv(const std::vector<T>& mat,
                          const std::vector<uint32_t>& shape,
+                         const std::vector<uint32_t>& matBatchStrides,
                          const std::vector<T>& vec,
+                         const std::vector<uint32_t>& vecBatchStrides,
                          bool disableSubgroups = false,
-                         const std::vector<uint32_t>& matBatchStrides = {},
-                         const std::vector<uint32_t>& vecBatchStrides = {},
                          bool matTranspose = false) {
     uint32_t vecSize = matTranspose ? shape[shape.size() - 2]
                                     : shape[shape.size() - 1];
@@ -40,12 +40,12 @@ class MatrixVectorMultiplyTests : public BetaNNTests {
   template<typename T>
   std::vector<T> GpuGemvt(const std::vector<T>& mat,
                           const std::vector<uint32_t>& shape,
+                          const std::vector<uint32_t>& matBatchStrides,
                           const std::vector<T>& vec,
-                          bool disableSubgroups = false,
-                          const std::vector<uint32_t>& matBatchStrides = {},
-                          const std::vector<uint32_t>& vecBatchStrides = {}) {
-    return GpuGemv(mat, shape, vec, disableSubgroups,
-                   matBatchStrides, vecBatchStrides, true);
+                          const std::vector<uint32_t>& vecBatchStrides,
+                          bool disableSubgroups = false) {
+    return GpuGemv(mat, shape, matBatchStrides, vec, vecBatchStrides,
+                   disableSubgroups, true);
   }
 
   std::vector<bool> GetParameters() {
@@ -86,7 +86,7 @@ TEST_F(MatrixVectorMultiplyTests, Contiguous) {
       auto b = RandomNumbers<int32_t>(K, 10);
       SCOPED_TRACE(fmt::format("Subgroups: {}, Shape: {}x{}",
                                !disableSubgroups, M, K));
-      EXPECT_EQ(GpuGemv(a, {M, K}, b, disableSubgroups),
+      EXPECT_EQ(GpuGemv(a, {M, K}, {0}, b, {0}, disableSubgroups),
                 CpuMatmul(a, {M, K}, {K, 1}, b, {K, 1}, {1, 0}));
     }
   }
@@ -106,7 +106,7 @@ TEST_F(MatrixVectorMultiplyTests, ContiguousBatches) {
       auto y = RandomNumbers<float>(B * K, 10);
       SCOPED_TRACE(fmt::format("Subgroups: {}, Batch: {}, Shape: {}x{}",
                                !disableSubgroups, B, M, K));
-      EXPECT_EQ(GpuGemv(x, {B, M ,K}, y, disableSubgroups, {M * K}, {K}),
+      EXPECT_EQ(GpuGemv(x, {B, M ,K}, {M * K}, y, {K}, disableSubgroups),
                 CpuMatmul(x, {B, M, K}, {M * K, K, 1},
                           y, {B, K, 1}, {K, 1, 0}));
     }
@@ -125,8 +125,8 @@ TEST_F(MatrixVectorMultiplyTests, NonContiguousBatches) {
       auto y = RandomNumbers<float>(A * B * K, 10);
       SCOPED_TRACE(fmt::format("Subgroups: {}, Batch: {}x{}, Shape: {}x{}",
                                !disableSubgroups, A, B, M, K));
-      EXPECT_EQ(GpuGemv(x, {A, B, M ,K}, y, disableSubgroups,
-                        {B * M * K, M * K}, {B * K, K}),
+      EXPECT_EQ(GpuGemv(x, {A, B, M ,K}, {B * M * K, M * K}, y, {B * K, K},
+                        disableSubgroups),
                 CpuMatmul(x, {A, B, M, K}, {B * M * K, M * K, K, 1},
                           y, {A, B, K, 1}, {B * K, K, 1, 0}));
     }
@@ -138,13 +138,13 @@ TEST_F(MatrixVectorMultiplyTests, VirtualBatches) {
     uint32_t M = 5, K = 4;
     auto x = RandomNumbers<float>(M * K, 10);
     auto y = RandomNumbers<float>(K, 10);
-    EXPECT_EQ(GpuGemv(x, {10, M, K}, y, disableSubgroups, {0}, {0}),
+    EXPECT_EQ(GpuGemv(x, {10, M, K}, {0}, y, {0}, disableSubgroups),
               CpuMatmul(x, {10, M, K}, {0, K, 1},
                         y, {10, K, 1}, {0, 1, 1}));
     uint32_t B = 2;
     x = RandomNumbers<float>(B * M * K, 10);
     y = RandomNumbers<float>(B * K, 10);
-    EXPECT_EQ(GpuGemv(x, {8, B, M, K}, y, disableSubgroups, {0, M * K}, {0, K}),
+    EXPECT_EQ(GpuGemv(x, {8, B, M, K}, {0, M * K}, y, {0, K}, disableSubgroups),
               CpuMatmul(x, {8, B, M, K}, {0, M * K, K, 1},
                         y, {8, B, K, 1}, {0, K, 1, 1}));
   }
@@ -173,7 +173,7 @@ TEST_F(MatrixVectorMultiplyTests, TransposeContiguous) {
       auto y = RandomNumbers<int32_t>(M, 10);
       SCOPED_TRACE(fmt::format("Subgroups: {}, Shape: {}x{}",
                                !disableSubgroups, M, K));
-      EXPECT_EQ(GpuGemvt(x, {M, K}, y, disableSubgroups),
+      EXPECT_EQ(GpuGemvt(x, {M, K}, {0}, y, {0}, disableSubgroups),
                 CpuMatmul(x, {K, M}, {1, K}, y, {M, 1}, {1, 0}));
     }
   }
@@ -193,7 +193,7 @@ TEST_F(MatrixVectorMultiplyTests, TransposeContiguousBatches) {
       auto y = RandomNumbers<float>(B * M, 10);
       SCOPED_TRACE(fmt::format("Subgroups: {}, Batch: {}, Shape: {}x{}",
                                !disableSubgroups, B, M, K));
-      EXPECT_EQ(GpuGemvt(x, {B, M, K}, y, disableSubgroups, {M * K}, {M}),
+      EXPECT_EQ(GpuGemvt(x, {B, M, K}, {M * K}, y, {M}, disableSubgroups),
                 CpuMatmul(x, {B, K, M}, {M * K, 1, K},
                           y, {B, M, 1}, {M, 1, 0}));
     }
@@ -212,8 +212,8 @@ TEST_F(MatrixVectorMultiplyTests, TranposeNonContiguous) {
       auto y = RandomNumbers<float>(A * B * M, 10);
       SCOPED_TRACE(fmt::format("Subgroups: {}, Batch: {}x{}, Shape: {}x{}",
                                !disableSubgroups, A, B, M, K));
-      EXPECT_EQ(GpuGemvt(x, {A, B, M ,K}, y, disableSubgroups,
-                         {B * M * K, M * K}, {B * M, M}),
+      EXPECT_EQ(GpuGemvt(x, {A, B, M ,K}, {B * M * K, M * K}, y, {B * M, M},
+                         disableSubgroups),
                 CpuMatmul(x, {A, B, K, M}, {B * M * K, M * K, 1, K},
                           y, {A, B, M, 1}, {B * M, M, 1, 0}));
     }
@@ -225,13 +225,13 @@ TEST_F(MatrixVectorMultiplyTests, TransposeVirtualBatches) {
     uint32_t M = 5, K = 4;
     auto x = RandomNumbers<float>(M * K, 10);
     auto y = RandomNumbers<float>(M, 10);
-    EXPECT_EQ(GpuGemv(x, {10, M, K}, y, disableSubgroups, {0}, {0}),
+    EXPECT_EQ(GpuGemv(x, {10, M, K}, {0}, y, {0}, disableSubgroups),
               CpuMatmul(x, {10, M, K}, {0, K, 1},
                         y, {10, M, 1}, {0, 1, 1}));
     uint32_t B = 2;
     x = RandomNumbers<float>(B * M * K, 10);
     y = RandomNumbers<float>(B * M, 10);
-    EXPECT_EQ(GpuGemv(x, {8, B, M, K}, y, disableSubgroups, {0, M * K}, {0, M}),
+    EXPECT_EQ(GpuGemv(x, {8, B, M, K}, {0, M * K}, y, {0, M}, disableSubgroups),
               CpuMatmul(x, {8, B, M, K}, {0, M * K, K, 1},
                         y, {8, B, M, 1}, {0, M, 1, 1}));
   }

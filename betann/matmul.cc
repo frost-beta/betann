@@ -59,6 +59,7 @@ void MatrixVectorMultiply(Device& device,
                           const wgpu::Buffer& vec,
                           const std::vector<uint32_t>& batchStridesVec,
                           bool disableSubgroups) {
+  assert(!batchStridesMat.empty() && !batchStridesVec.empty());
   // Figure out whether to use subgroups kernel.
   bool enableSubgroups = !disableSubgroups && device.SupportsSubgroups();
   bool enableSubgroupsF16 = false;
