@@ -76,7 +76,7 @@ cmake_policy(SET CMP0097 NEW)  # enable GIT_SUBMODULES
 FetchContent_Declare(
   dawn
   GIT_REPOSITORY https://dawn.googlesource.com/dawn
-  GIT_TAG "chromium/6972"
+  GIT_TAG "chromium/7012"
   GIT_SHALLOW ON
   GIT_SUBMODULES ""  # no submodules
   UPDATE_DISCONNECTED ON  # no update when re-generating

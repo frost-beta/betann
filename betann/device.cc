@@ -10,7 +10,7 @@ namespace betann {
 Device::Device() {
   // Create instance.
   wgpu::InstanceDescriptor instanceDescriptor;
-  instanceDescriptor.features.timedWaitAnyEnable = true;
+  instanceDescriptor.capabilities.timedWaitAnyEnable = true;
   instance_ = wgpu::CreateInstance(&instanceDescriptor);
   if (!instance_)
     throw std::runtime_error("CreateInstance failed.");
@@ -49,9 +49,6 @@ Device::Device() {
     "disable_lazy_clear_for_mapped_at_creation_buffer",
     "disable_robustness",
     "skip_validation",
-    // Work around a dawn bug:
-    // https://github.com/gpuweb/gpuweb/discussions/5063
-    "use_tint_ir",
   };
   wgpu::DawnTogglesDescriptor togglesDescriptor;
   togglesDescriptor.enabledToggles = toggles.data();
@@ -80,25 +77,27 @@ Device::Device() {
       wgpu::CallbackMode::AllowSpontaneous,
       [](const wgpu::Device& device,
          wgpu::DeviceLostReason reason,
-         const char* message) {
-        if (reason != wgpu::DeviceLostReason::Destroyed)
-          throw std::runtime_error(fmt::format("Device lost: {}", message));
+         wgpu::StringView message) {
+        if (reason != wgpu::DeviceLostReason::Destroyed) {
+          throw std::runtime_error(
+              fmt::format("Device lost: {}", message.data));
+        }
       });
   deviceDescriptor.SetUncapturedErrorCallback(
       [](const wgpu::Device& device,
          wgpu::ErrorType type,
-         const char* message) {
-        throw std::runtime_error(message);
+         wgpu::StringView message) {
+        throw std::runtime_error(message.data);
       });
   future = adapter_.RequestDevice(
       &deviceDescriptor,
       wgpu::CallbackMode::WaitAnyOnly,
       [this](wgpu::RequestDeviceStatus status,
              wgpu::Device result,
-             const char* message) {
+             wgpu::StringView message) {
         if (status != wgpu::RequestDeviceStatus::Success) {
           throw std::runtime_error(
-              fmt::format("RequestDevice failed: {}", message));
+              fmt::format("RequestDevice failed: {}", message.data));
         }
         device_ = std::move(result);
       });
