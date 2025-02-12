@@ -23,11 +23,12 @@ const workgroup_size_col: u32 = 32;
 @group(0) @binding(1) var<storage, read> mat: array<dtype>;
 @group(0) @binding(2) var<uniform> mat_rows: u32;
 @group(0) @binding(3) var<uniform> mat_cols: u32;
-@group(0) @binding(4) var<storage, read> batch_strides_mat: array<u32>;
-@group(0) @binding(5) var<storage, read> vec: array<dtype>;
-@group(0) @binding(6) var<storage, read> batch_strides_vec: array<u32>;
+@group(0) @binding(4) var<uniform> mat_row_stride: u32;
+@group(0) @binding(5) var<storage, read> batch_strides_mat: array<u32>;
+@group(0) @binding(6) var<storage, read> vec: array<dtype>;
+@group(0) @binding(7) var<storage, read> batch_strides_vec: array<u32>;
 if (!$contiguous) {
-  @group(0) @binding(7) var<storage, read> batch_shape: array<u32>;
+  @group(0) @binding(8) var<storage, read> batch_shape: array<u32>;
 }
 
 // The workgroup_result collects results from each thread.
@@ -65,7 +66,7 @@ fn gemv(if ($enable_subgroups) {
     var mat_offset = coord_to_index(tid.z, &batch_shape, &batch_strides_mat);
     let vec_offset = coord_to_index(tid.z, &batch_shape, &batch_strides_vec);
   }
-  mat_offset += out_row * mat_cols;
+  mat_offset += out_row * mat_row_stride;
 
   // Per-thread result and intermediates.
   var result: array<dtype, row_work_per_thread>;
@@ -81,7 +82,7 @@ fn gemv(if ($enable_subgroups) {
     // Work.
     for (var r = 0u; r < row_work_per_thread; r++) {
       // Load row.
-      load_unsafe(&intermediate, &mat, mat_offset + r * mat_cols + col);
+      load_unsafe(&intermediate, &mat, mat_offset + r * mat_row_stride + col);
 
       // Accumulate results.
       for (var c = 0u; c < col_work_per_thread; c++) {
@@ -105,8 +106,8 @@ fn gemv(if ($enable_subgroups) {
     for (var r = 0u; r < row_work_per_thread; r++) {
       load_safe(&intermediate,
                 &mat,
-                mat_offset + mat_rows * mat_cols,
-                mat_offset + r * mat_cols + col);
+                mat_offset + r * mat_row_stride + mat_cols,
+                mat_offset + r * mat_row_stride + col);
       for (var c = 0u; c < col_work_per_thread; c++) {
         if ($dtype_is_floating) {
           result[r] = fma(intermediate[c], coefficient[c], result[r]);

@@ -106,18 +106,34 @@ TEST_F(MatrixMultiplyTest, GEMVNonContiguous) {
                       b, {4, 1}, {1, 1}),
             CpuMatmul(a, {5, 4}, {0, 1},
                       b, {4, 1}, {1, 1}));
+  // matmul(a_broadcast.T, b)
+  b = RandomNumbers<float>(5, 10);
+  EXPECT_EQ(GpuMatmul(a, {4, 5}, {1, 0},
+                      b, {5, 1}, {1, 1}),
+            CpuMatmul(a, {4, 5}, {1, 0},
+                      b, {5, 1}, {1, 1}));
   // matmul(a_broadcast, b_broadcast)
   b = RandomNumbers<float>(1, 10);
   EXPECT_EQ(GpuMatmul(a, {5, 4}, {0, 1},
                       b, {4, 1}, {0, 0}),
             CpuMatmul(a, {5, 4}, {0, 1},
                       b, {4, 1}, {0, 0}));
+  // matmul(a_broadcast.T, b_broadcast)
+  EXPECT_EQ(GpuMatmul(a, {4, 5}, {1, 0},
+                      b, {5, 1}, {0, 0}),
+            CpuMatmul(a, {4, 5}, {1, 0},
+                      b, {5, 1}, {0, 0}));
   // matmul(a, b_broadcast)
   a = RandomNumbers<float>(20, 10);
   EXPECT_EQ(GpuMatmul(a, {5, 4}, {4, 1},
                       b, {4, 1}, {0, 0}),
             CpuMatmul(a, {5, 4}, {4, 1},
                       b, {4, 1}, {0, 0}));
+  // matmul(a.T, b_broadcast)
+  EXPECT_EQ(GpuMatmul(a, {4, 5}, {1, 4},
+                      b, {5, 1}, {0, 0}),
+            CpuMatmul(a, {4, 5}, {1, 4},
+                      b, {5, 1}, {0, 0}));
 }
 
 TEST_F(MatrixMultiplyTest, GEMVNonContiguousBatch) {

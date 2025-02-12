@@ -29,11 +29,12 @@ const cols_per_workgroup = col_work_per_thread * group_cols * group_count;
 @group(0) @binding(1) var<storage, read> mat: array<dtype>;
 @group(0) @binding(2) var<uniform> mat_rows: u32;
 @group(0) @binding(3) var<uniform> mat_cols: u32;
-@group(0) @binding(4) var<storage, read> batch_strides_mat: array<u32>;
-@group(0) @binding(5) var<storage, read> vec: array<dtype>;
-@group(0) @binding(6) var<storage, read> batch_strides_vec: array<u32>;
+@group(0) @binding(4) var<uniform> mat_row_stride: u32;
+@group(0) @binding(5) var<storage, read> batch_strides_mat: array<u32>;
+@group(0) @binding(6) var<storage, read> vec: array<dtype>;
+@group(0) @binding(7) var<storage, read> batch_strides_vec: array<u32>;
 if (!$contiguous) {
-  @group(0) @binding(7) var<storage, read> batch_shape: array<u32>;
+  @group(0) @binding(8) var<storage, read> batch_shape: array<u32>;
 }
 
 if (!$enable_subgroups) {
@@ -79,7 +80,7 @@ fn gemvt(@builtin(workgroup_id) tid: vec3<u32>,
     for (var r = 0u; r < row_work_per_thread; r++) {
       // Load col.
       for (var c = 0u; c < col_work_per_thread; c++) {
-        intermediate[c] = mat[mat_offset + (row + r) * mat_cols + out_col + c];
+        intermediate[c] = mat[mat_offset + (row + r) * mat_row_stride + out_col + c];
       }
 
       // Accumulate results.
@@ -100,7 +101,7 @@ fn gemvt(@builtin(workgroup_id) tid: vec3<u32>,
     for (var r = 0u; r < row_work_per_thread && row + r < mat_rows; r++) {
       coefficient[r] = vec[vec_offset + row + r];
       for (var c = 0u; c < col_work_per_thread && out_col + c < mat_cols; c++) {
-        intermediate[c] = mat[mat_offset + (row + r) * mat_cols + out_col + c];
+        intermediate[c] = mat[mat_offset + (row + r) * mat_row_stride + out_col + c];
       }
       for (var c = 0u; c < col_work_per_thread && out_col + c < mat_cols; c++) {
         if ($dtype_is_floating) {

@@ -11,26 +11,17 @@ namespace betann {
 
 namespace {
 
-bool IsTranposed(const std::vector<uint32_t>& shape,
-                 const std::vector<uint32_t>& strides,
-                 bool mustBeContiguous) {
-  return strides[strides.size() - 2] == 1 &&
-         (strides[strides.size() - 1] == shape[shape.size() - 2] ||
-          !mustBeContiguous);
-}
-
-bool NeedsContiguousCopy(const std::vector<uint32_t>& shape,
-                         const std::vector<uint32_t>& strides,
-                         bool isMatrixVector) {
+std::tuple<bool /* transposed */, bool /* needsCopy */, uint32_t /* stride */>
+NeedsContiguousCopy(const std::vector<uint32_t>& shape,
+                    const std::vector<uint32_t>& strides,
+                    bool isVector) {
   auto stx = strides[strides.size() - 2];
   auto sty = strides[strides.size() - 1];
-  if (!isMatrixVector && (stx == 1 || sty == 1))
-    return false;  // the gemm kernel supports non-contiguous vector
-  if (stx == 1 && sty == shape[shape.size() - 2])
-    return false;
-  if (sty == 1 && stx == shape[shape.size() - 1])
-    return false;
-  return true;
+  if (sty == 1 && (!isVector || stx == shape[shape.size() - 1]))
+    return {false, false, stx};
+  if (stx == 1 && (!isVector || sty == shape[shape.size() - 2]))
+    return {true, false, sty};
+  return {false, true, shape[shape.size() - 1]};
 }
 
 wgpu::Buffer CopyArray(Device& device,
@@ -55,11 +46,11 @@ void MatrixVectorMultiply(Device& device,
                           bool matTranspose,
                           uint32_t matRows,
                           uint32_t matCols,
+                          uint32_t matRowStride,
                           const std::vector<uint32_t>& batchStridesMat,
                           const wgpu::Buffer& vec,
                           const std::vector<uint32_t>& batchStridesVec,
                           bool disableSubgroups) {
-  assert(!batchStridesMat.empty() && !batchStridesVec.empty());
   // Figure out whether to use subgroups kernel.
   bool enableSubgroups = !disableSubgroups && device.SupportsSubgroups();
   bool enableSubgroupsF16 = false;
@@ -140,9 +131,14 @@ void MatrixVectorMultiply(Device& device,
               mat,
               device.CreateBufferFromScalar(matRows),
               device.CreateBufferFromScalar(matCols),
-              device.CreateBufferFromVector(batchStridesMat),
+              device.CreateBufferFromScalar(matRowStride),
+              batchStridesMat.empty()
+                  ? device.CreateBufferFromScalar(0u)
+                  : device.CreateBufferFromVector(batchStridesMat),
               vec,
-              device.CreateBufferFromVector(batchStridesVec),
+              batchStridesVec.empty()
+                  ? device.CreateBufferFromScalar(0u)
+                  : device.CreateBufferFromVector(batchStridesVec),
               !contiguous ? device.CreateBufferFromVector(batchShape) : nullptr,
             },
             {
@@ -180,19 +176,14 @@ void MatrixMultiply(Device& device,
   bool isMatrixVector = M == 1 || N == 1;
 
   // Check transpose state and do contiguous copies when necessary.
-  bool aTransposed, bTransposed;
-  if (NeedsContiguousCopy(aShape, aStrides, isMatrixVector)) {
-    aTransposed = false;
+  auto [aTransposed, aNeedsCopy, aLeadingStride] =
+      NeedsContiguousCopy(aShape, aStrides, M == 1);
+  auto [bTransposed, bNeedsCopy, bLeadingStride] =
+      NeedsContiguousCopy(bShape, bStrides, N == 1);
+  if (aNeedsCopy)
     a = CopyArray(device, dataType, a, aShape, aStrides);
-  } else {
-    aTransposed = IsTranposed(aShape, aStrides, isMatrixVector);
-  }
-  if (NeedsContiguousCopy(bShape, bStrides, isMatrixVector)) {
-    bTransposed = false;
+  if (bNeedsCopy)
     b = CopyArray(device, dataType, b, bShape, bStrides);
-  } else {
-    bTransposed = IsTranposed(bShape, bStrides, isMatrixVector);
-  }
 
   // Collapse batch dimensions.
   std::vector<uint32_t> aBatchShape = Slice(aShape, 0, -2);
@@ -233,6 +224,7 @@ void MatrixMultiply(Device& device,
                                                   : bShape[bShape.size() - 1])
                                    : (aTransposed ? aShape[aShape.size() - 2]
                                                   : aShape[aShape.size() - 1]),
+                         bIsMatrix ? bLeadingStride : aLeadingStride,
                          bIsMatrix ? bBatchStrides : aBatchStrides,
                          bIsMatrix ? a: b,
                          bIsMatrix ? aBatchStrides : bBatchStrides);
