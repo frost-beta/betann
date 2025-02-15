@@ -12,8 +12,20 @@ struct Buffer {
   uint64_t size = WGPU_WHOLE_SIZE;
   uint64_t offset = 0;
 
+  Buffer() {}
+  Buffer(std::nullptr_t) {}
   Buffer(wgpu::Buffer data) : data(std::move(data)) {}
-  Buffer(std::nullptr_t) : data(nullptr) {}
+
+  bool operator==(std::nullptr_t) const {
+    return data == nullptr;
+  }
+  bool operator!=(std::nullptr_t) const {
+    return data != nullptr;
+  }
+
+  explicit operator bool() const {
+    return static_cast<bool>(data);
+  }
 
   uint64_t GetSize() const {
     return size == WGPU_WHOLE_SIZE ? data.GetSize() : size;
