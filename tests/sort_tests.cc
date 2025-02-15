@@ -9,9 +9,9 @@ class SortTests : public BetaNNTests {
                          const std::vector<uint32_t>& shape,
                          const std::vector<uint32_t>& strides) {
     uint32_t inputNumElements = betann::NumElements(shape, strides);
-    wgpu::Buffer out = device_.CreateBuffer(
+    betann::Buffer out = device_.CreateBuffer(
         inputNumElements * sizeof(T),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
     betann::SortBlock(device_,
                       axis,
                       inputType,
@@ -33,9 +33,9 @@ class SortTests : public BetaNNTests {
                                    const std::vector<uint32_t>& shape,
                                    const std::vector<uint32_t>& strides) {
     uint32_t inputNumElements = betann::NumElements(shape, strides);
-    wgpu::Buffer sortedIndices = device_.CreateBuffer(
+    betann::Buffer sortedIndices = device_.CreateBuffer(
         inputNumElements * sizeof(uint32_t),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
     betann::SortBlock(device_,
                       axis,
                       inputType,

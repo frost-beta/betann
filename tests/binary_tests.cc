@@ -8,10 +8,10 @@ class BinaryTests : public BetaNNTests {
                                        const std::vector<I>& a,
                                        const std::vector<I>& b) {
     size_t outputNumElements = std::max(a.size(), b.size());
-    wgpu::Buffer output = device_.CreateBuffer(
+    betann::Buffer output = device_.CreateBuffer(
         outputNumElements * sizeof(T),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
-    output.SetLabel("output");
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
+    output.data.SetLabel("output");
     betann::BinaryOpContiguous(device_,
                                name,
                                type,
@@ -33,10 +33,10 @@ class BinaryTests : public BetaNNTests {
                                     const std::vector<I>& b,
                                     const std::vector<uint32_t>& bStrides) {
     uint32_t outputNumElements = betann::NumElements(shape);
-    wgpu::Buffer output = device_.CreateBuffer(
+    betann::Buffer output = device_.CreateBuffer(
         outputNumElements * sizeof(T),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
-    output.SetLabel("output");
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
+    output.data.SetLabel("output");
     betann::BinaryOpGeneral(device_,
                             name,
                             betann::GetDataType<T>(),

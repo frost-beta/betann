@@ -6,10 +6,10 @@ class CopyTests : public BetaNNTests {
   std::vector<T> RunCopyContiguous(betann::CopyType type,
                                    size_t dstNumElements,
                                    const std::vector<I>& src) {
-    wgpu::Buffer dst = device_.CreateBuffer(
+    betann::Buffer dst = device_.CreateBuffer(
         dstNumElements * sizeof(T),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
-    dst.SetLabel("destination");
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
+    dst.data.SetLabel("destination");
     betann::CopyContiguous(device_,
                            type,
                            betann::GetDataType<T>(),
@@ -26,10 +26,10 @@ class CopyTests : public BetaNNTests {
                                 const std::vector<uint32_t>& srcShape,
                                 const std::vector<uint32_t>& srcStrides) {
     uint32_t dstNumElements = betann::NumElements(srcShape);
-    wgpu::Buffer dst = device_.CreateBuffer(
+    betann::Buffer dst = device_.CreateBuffer(
         dstNumElements * sizeof(T),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
-    dst.SetLabel("destination");
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
+    dst.data.SetLabel("destination");
     betann::CopyGeneral(device_,
                         betann::GetDataType<T>(),
                         dst,
@@ -47,10 +47,10 @@ class CopyTests : public BetaNNTests {
                                     const std::vector<uint32_t>& srcShape,
                                     const std::vector<uint32_t>& srcStrides) {
     uint32_t dstNumElements = betann::NumElements(srcShape, dstStrides);
-    wgpu::Buffer dst = device_.CreateBuffer(
+    betann::Buffer dst = device_.CreateBuffer(
         dstNumElements * sizeof(T),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
-    dst.SetLabel("destination");
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
+    dst.data.SetLabel("destination");
     betann::CopyGeneralBoth(device_,
                             betann::GetDataType<T>(),
                             dst,

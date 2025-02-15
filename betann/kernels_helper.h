@@ -19,7 +19,7 @@ void RunKernel(Device& device,
                const std::string& kernelName,
                const std::string& shaderKey,
                F&& getSource,
-               std::vector<wgpu::Buffer> buffers,
+               std::vector<Buffer> buffers,
                Dims3 workgroupsCount) {
   const wgpu::ShaderModule& shader = device.CreateShaderModule(
       shaderKey.c_str(),

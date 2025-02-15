@@ -7,14 +7,16 @@
 class BetaNNTests : public testing::Test {
  protected:
   template<typename T>
-  std::vector<T> ReadFromBuffer(const wgpu::Buffer& buf, size_t size) {
-    wgpu::Buffer staging = device_.CopyToStagingBuffer(buf);
+  std::vector<T> ReadFromBuffer(const betann::Buffer& buf, size_t size) {
+    betann::Buffer staging = device_.CopyToStagingBuffer(buf);
     device_.Flush();
     std::vector<T> out(size);
-    device_.WaitFor(device_.ReadStagingBuffer(
+    device_.WaitFor(device_.ReadFullStagingBuffer(
         staging,
-        [&](const void* data) {
-          std::memcpy(out.data(), data, size * sizeof(T));
+        [&](const void* data, uint64_t size, uint64_t offset) {
+          std::memcpy(out.data(),
+                      static_cast<const char*>(data) + offset,
+                      size);
         }));
     return out;
   }

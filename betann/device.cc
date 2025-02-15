@@ -155,16 +155,16 @@ void Device::WaitAll() {
   }
 }
 
-wgpu::Buffer Device::CreateBuffer(size_t size, wgpu::BufferUsage usage) {
+Buffer Device::CreateBuffer(uint64_t size, BufferUsage usage) {
   wgpu::BufferDescriptor descriptor;
   descriptor.usage = usage;
   descriptor.size = size;
-  return device_.CreateBuffer(&descriptor);
+  return {device_.CreateBuffer(&descriptor)};
 }
 
-wgpu::Buffer Device::CreateBufferFromData(const void* data,
-                                          size_t size,
-                                          wgpu::BufferUsage usage) {
+Buffer Device::CreateBufferFromData(const void* data,
+                                    uint64_t size,
+                                    BufferUsage usage) {
   wgpu::BufferDescriptor descriptor;
   descriptor.usage = usage;
   descriptor.size = size;
@@ -172,31 +172,26 @@ wgpu::Buffer Device::CreateBufferFromData(const void* data,
   wgpu::Buffer buffer = device_.CreateBuffer(&descriptor);
   memcpy(buffer.GetMappedRange(), data, size);
   buffer.Unmap();
-  return buffer;
+  return {std::move(buffer)};
 }
 
-wgpu::Buffer Device::CopyToStagingBuffer(const wgpu::Buffer& buffer) {
-  wgpu::Buffer staging = CreateBuffer(buffer.GetSize(),
-                                      wgpu::BufferUsage::MapRead |
-                                      wgpu::BufferUsage::CopyDst);
-  CopyBufferToBuffer(buffer, staging);
+Buffer Device::CopyToStagingBuffer(const Buffer& buffer) {
+  Buffer staging = CreateBuffer(buffer.GetSize(), BufferUsage::MapRead |
+                                                  BufferUsage::CopyDst);
+  staging.size = buffer.size;
+  staging.offset = buffer.offset;
+  CopyBufferToBuffer(buffer.data, staging.data);
   return staging;
 }
 
-void Device::CopyBufferToBuffer(const wgpu::Buffer& src,
-                                const wgpu::Buffer& dst) {
-  EnsureEncoder();
-  encoder_.CopyBufferToBuffer(src, 0, dst, 0, src.GetSize());
+void Device::WriteBuffer(void* data, uint64_t size, Buffer& buffer) {
+  queue_.WriteBuffer(buffer.data, buffer.offset, data, size);
 }
 
-void Device::WriteBuffer(void* data, size_t size, wgpu::Buffer* buffer) {
-  queue_.WriteBuffer(*buffer, 0, data, size);
-}
-
-wgpu::Future Device::ReadStagingBuffer(
-    const wgpu::Buffer& buffer,
-    std::function<void(const void* data)> cb) {
-  return AddFuture(buffer.MapAsync(
+wgpu::Future Device::ReadFullStagingBuffer(
+    const Buffer& buffer,
+    std::function<void(const void* data, uint64_t size, uint64_t offset)> cb) {
+  return AddFuture(buffer.data.MapAsync(
       wgpu::MapMode::Read,
       0,
       wgpu::kWholeMapSize,
@@ -205,8 +200,8 @@ wgpu::Future Device::ReadStagingBuffer(
                                  const char* message) {
         if (status != wgpu::MapAsyncStatus::Success)
           throw std::runtime_error(fmt::format("MapAsync failed: {}", message));
-        cb(buffer.GetConstMappedRange());
-        buffer.Unmap();
+        cb(buffer.data.GetConstMappedRange(), buffer.GetSize(), buffer.offset);
+        buffer.data.Unmap();
       }));
 }
 
@@ -243,14 +238,16 @@ const wgpu::ComputePipeline& Device::CreateKernel(
 }
 
 wgpu::BindGroup Device::CreateBindGroup(const wgpu::ComputePipeline& kernel,
-                                        std::vector<wgpu::Buffer> buffers) {
+                                        std::vector<Buffer> buffers) {
   std::vector<wgpu::BindGroupEntry> entries;
   uint32_t index = 0;
-  for (wgpu::Buffer& buffer : buffers) {
-    if (buffer) {
+  for (Buffer& buffer : buffers) {
+    if (buffer.data) {
       wgpu::BindGroupEntry entry;
       entry.binding = index++;
-      entry.buffer = std::move(buffer);
+      entry.buffer = std::move(buffer.data);
+      entry.size = buffer.size;
+      entry.offset = buffer.offset;
       entries.push_back(std::move(entry));
     }
   }
@@ -284,6 +281,12 @@ void Device::EndEncoding() {
     return;
   commands_.push_back(encoder_.Finish());
   encoder_ = nullptr;
+}
+
+void Device::CopyBufferToBuffer(const wgpu::Buffer& src,
+                                const wgpu::Buffer& dst) {
+  EnsureEncoder();
+  encoder_.CopyBufferToBuffer(src, 0, dst, 0, src.GetSize());
 }
 
 wgpu::Future Device::AddFuture(const wgpu::Future& future) {

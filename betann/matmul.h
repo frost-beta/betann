@@ -9,14 +9,14 @@ namespace betann {
 void MatrixVectorMultiply(Device& device,
                           DataType dataType,
                           const std::vector<uint32_t>& batchShape,
-                          const wgpu::Buffer& out,
-                          const wgpu::Buffer& mat,
+                          const Buffer& out,
+                          const Buffer& mat,
                           bool matTranspose,
                           uint32_t matRows,
                           uint32_t matCols,
                           uint32_t matRowStride,
                           const std::vector<uint32_t>& batchStridesMat,
-                          const wgpu::Buffer& vec,
+                          const Buffer& vec,
                           const std::vector<uint32_t>& batchStridesVec,
                           bool disableSubgroups = false);
 

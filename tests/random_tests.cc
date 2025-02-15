@@ -5,10 +5,10 @@ class RandomTests : public BetaNNTests {
   template<typename T>
   std::vector<T> RunRandomBitsContiguous(uint32_t outNumElements,
                                          const std::vector<uint32_t>& keys) {
-    wgpu::Buffer out = device_.CreateBuffer(
+    betann::Buffer out = device_.CreateBuffer(
         outNumElements * sizeof(T),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
-    out.SetLabel("out");
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
+    out.data.SetLabel("out");
     betann::RandomBitsContiguous(device_,
                                  betann::GetDataType<T>(),
                                  out,
@@ -24,10 +24,10 @@ class RandomTests : public BetaNNTests {
                                       const std::vector<uint32_t>& keys,
                                       const std::vector<uint32_t>& shape,
                                       const std::vector<uint32_t>& strides) {
-    wgpu::Buffer out = device_.CreateBuffer(
+    betann::Buffer out = device_.CreateBuffer(
         outNumElements * sizeof(T),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
-    out.SetLabel("out");
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
+    out.data.SetLabel("out");
     betann::RandomBitsGeneral(device_,
                               betann::GetDataType<T>(),
                               out,

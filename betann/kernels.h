@@ -11,7 +11,7 @@ void ArrayRange(Device& device,
                 double start,
                 double step,
                 DataType dataType,
-                const wgpu::Buffer& out);
+                const Buffer& out);
 
 enum class BinaryOpType {
   // Both operands are scalars.
@@ -29,22 +29,22 @@ void BinaryOpContiguous(Device& device,
                         const char* name,
                         BinaryOpType type,
                         DataType outputDataType,
-                        const wgpu::Buffer& output,
+                        const Buffer& output,
                         uint32_t outputNumElements,
                         DataType inputDataType,
-                        const wgpu::Buffer& a,
-                        const wgpu::Buffer& b);
+                        const Buffer& a,
+                        const Buffer& b);
 
 // Run binary operands on virtual inputs and write to contiguous output.
 void BinaryOpGeneral(Device& device,
                      const char* name,
                      DataType outputDataType,
-                     const wgpu::Buffer& output,
+                     const Buffer& output,
                      const std::vector<uint32_t>& shape,
                      DataType inputDataType,
-                     const wgpu::Buffer& a,
+                     const Buffer& a,
                      const std::vector<uint32_t>& aStrides,
-                     const wgpu::Buffer& b,
+                     const Buffer& b,
                      const std::vector<uint32_t>& bStrides);
 
 enum class CopyType {
@@ -59,55 +59,55 @@ enum class CopyType {
 void CopyContiguous(Device& device,
                     CopyType type,
                     DataType dstDataType,
-                    const wgpu::Buffer& dst,
+                    const Buffer& dst,
                     uint32_t dstNumElements,
                     DataType srcDataType,
-                    const wgpu::Buffer& src);
+                    const Buffer& src);
 
 // Copy data from virtual src to contiguous dst.
 void CopyGeneral(Device& device,
                  DataType dstDataType,
-                 const wgpu::Buffer& dst,
+                 const Buffer& dst,
                  DataType srcDataType,
-                 const wgpu::Buffer& src,
+                 const Buffer& src,
                  const std::vector<uint32_t>& srcShape,
                  const std::vector<uint32_t>& srcStrides);
 
 // Copy data from virtual src to virtual dst.
 void CopyGeneralBoth(Device& device,
                      DataType dstDataType,
-                     const wgpu::Buffer& dst,
+                     const Buffer& dst,
                      const std::vector<uint32_t>& dstStrides,
                      DataType srcDataType,
-                     const wgpu::Buffer& src,
+                     const Buffer& src,
                      const std::vector<uint32_t>& srcShape,
                      const std::vector<uint32_t>& srcStrides);
 
 // Multiply contiguous matrix.
 void MatrixMultiply(Device& device,
                     DataType dataType,
-                    const wgpu::Buffer& out,
-                    wgpu::Buffer a,
+                    const Buffer& out,
+                    Buffer a,
                     const std::vector<uint32_t>& aShape,
                     const std::vector<uint32_t>& aStrides,
-                    wgpu::Buffer b,
+                    Buffer b,
                     const std::vector<uint32_t>& bShape,
                     const std::vector<uint32_t>& bStrides);
 
 // Generate random bits from contiguous keys.
 void RandomBitsContiguous(Device& device,
                           DataType outDataType,
-                          const wgpu::Buffer& out,
+                          const Buffer& out,
                           uint32_t outNumElements,
-                          const wgpu::Buffer& keys,
+                          const Buffer& keys,
                           uint32_t keysNumElements);
 
 // Generate random bits from virual keys.
 void RandomBitsGeneral(Device& device,
                        DataType outDataType,
-                       const wgpu::Buffer& out,
+                       const Buffer& out,
                        uint32_t outNumElements,
-                       const wgpu::Buffer& keys,
+                       const Buffer& keys,
                        const std::vector<uint32_t>& keysShape,
                        const std::vector<uint32_t>& keysStrides);
 
@@ -134,10 +134,10 @@ void SortBlock(Device& device,
                uint32_t axis,
                SortInputType inputType,
                SortResultType resultType,
-               const wgpu::Buffer& out,
+               const Buffer& out,
                const std::vector<uint32_t>& outStrides,
                DataType inputDataType,
-               const wgpu::Buffer& input,
+               const Buffer& input,
                const std::vector<uint32_t>& inputShape,
                const std::vector<uint32_t>& inputStrides);
 
@@ -145,18 +145,18 @@ void SortBlock(Device& device,
 void UnaryOpContiguous(Device& device,
                        const char* name,
                        DataType outputDataType,
-                       const wgpu::Buffer& output,
+                       const Buffer& output,
                        DataType inputDataType,
-                       const wgpu::Buffer& input,
+                       const Buffer& input,
                        uint32_t inputNumElements);
 
 // Run unary operations on virual input.
 void UnaryOpGeneral(Device& device,
                     const char* name,
                     DataType outputDataType,
-                    const wgpu::Buffer& output,
+                    const Buffer& output,
                     DataType inputDataType,
-                    const wgpu::Buffer& input,
+                    const Buffer& input,
                     const std::vector<uint32_t>& inputShape,
                     const std::vector<uint32_t>& inputStrides);
 

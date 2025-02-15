@@ -24,14 +24,14 @@ NeedsContiguousCopy(const std::vector<uint32_t>& shape,
   return {false, true, shape[shape.size() - 1]};
 }
 
-wgpu::Buffer CopyArray(Device& device,
-                       DataType dataType,
-                       const wgpu::Buffer& src,
-                       const std::vector<uint32_t>& shape,
-                       const std::vector<uint32_t>& strides) {
-  wgpu::Buffer dst = device.CreateBuffer(
+Buffer CopyArray(Device& device,
+                 DataType dataType,
+                 const Buffer& src,
+                 const std::vector<uint32_t>& shape,
+                 const std::vector<uint32_t>& strides) {
+  Buffer dst = device.CreateBuffer(
       NumElements(shape) * SizeOf(dataType),
-      wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
+      BufferUsage::Storage | BufferUsage::CopyDst);
   CopyGeneral(device, dataType, dst, dataType, src, shape, strides);
   return dst;
 }
@@ -41,14 +41,14 @@ wgpu::Buffer CopyArray(Device& device,
 void MatrixVectorMultiply(Device& device,
                           DataType dataType,
                           const std::vector<uint32_t>& batchShape,
-                          const wgpu::Buffer& out,
-                          const wgpu::Buffer& mat,
+                          const Buffer& out,
+                          const Buffer& mat,
                           bool matTranspose,
                           uint32_t matRows,
                           uint32_t matCols,
                           uint32_t matRowStride,
                           const std::vector<uint32_t>& batchStridesMat,
-                          const wgpu::Buffer& vec,
+                          const Buffer& vec,
                           const std::vector<uint32_t>& batchStridesVec,
                           bool disableSubgroups) {
   // Figure out whether to use subgroups kernel.
@@ -152,11 +152,11 @@ void MatrixVectorMultiply(Device& device,
 
 void MatrixMultiply(Device& device,
                     DataType dataType,
-                    const wgpu::Buffer& out,
-                    wgpu::Buffer a,
+                    const Buffer& out,
+                    Buffer a,
                     const std::vector<uint32_t>& aShape,
                     const std::vector<uint32_t>& aStrides,
-                    wgpu::Buffer b,
+                    Buffer b,
                     const std::vector<uint32_t>& bShape,
                     const std::vector<uint32_t>& bStrides) {
   if (aShape.size() < 2 || bShape.size() < 2)

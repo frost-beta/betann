@@ -14,9 +14,9 @@ class MatrixMultiplyTest : public BetaNNTests {
       for (size_t i = 0; i < aShape.size() - 2; ++i)
         outSize *= aShape[i];
     }
-    wgpu::Buffer out = device_.CreateBuffer(
+    betann::Buffer out = device_.CreateBuffer(
         outSize * sizeof(T),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
     betann::MatrixMultiply(
        device_,
        betann::GetDataType<T>(),

@@ -16,9 +16,9 @@ class MatrixVectorMultiplyTests : public BetaNNTests {
                          bool matTranspose = false) {
     uint32_t vecSize = shape[shape.size() - 1];
     uint32_t outSize = betann::NumElements(shape) / vecSize;
-    wgpu::Buffer out = device_.CreateBuffer(
+    betann::Buffer out = device_.CreateBuffer(
         outSize * sizeof(T),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
     betann::MatrixVectorMultiply(
         device_,
        betann::GetDataType<T>(),

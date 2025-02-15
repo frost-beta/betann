@@ -8,9 +8,9 @@ class UnaryTests : public BetaNNTests {
       const std::vector<U>& input,
       betann::DataType outputDataType = betann::GetDataType<T>(),
       betann::DataType inputDataType = betann::GetDataType<U>()) {
-    wgpu::Buffer out = device_.CreateBuffer(
+    betann::Buffer out = device_.CreateBuffer(
         input.size() * SizeOf(outputDataType),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
     betann::UnaryOpContiguous(
         device_,
         op,
@@ -31,9 +31,9 @@ class UnaryTests : public BetaNNTests {
       const std::vector<uint32_t>& inputStrides,
       betann::DataType outputDataType = betann::GetDataType<T>(),
       betann::DataType inputDataType = betann::GetDataType<U>()) {
-    wgpu::Buffer out = device_.CreateBuffer(
+    betann::Buffer out = device_.CreateBuffer(
         betann::NumElements(inputShape, inputStrides) * SizeOf(outputDataType),
-        wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc);
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
     betann::UnaryOpGeneral(
         device_,
         op,

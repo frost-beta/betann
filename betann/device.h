@@ -7,8 +7,7 @@
 #include <type_traits>
 #include <vector>
 
-#include <webgpu/webgpu_cpp.h>
-
+#include "betann/buffer.h"
 #include "betann/data_type.h"
 #include "betann/utils.h"
 
@@ -30,33 +29,29 @@ class Device {
   void WaitFor(const wgpu::Future& future);
   void WaitAll();
 
-  wgpu::Buffer CreateBuffer(size_t size, wgpu::BufferUsage usage);
-  wgpu::Buffer CreateBufferFromData(
-      const void* data,
-      size_t size,
-      wgpu::BufferUsage usage = wgpu::BufferUsage::Storage);
+  Buffer CreateBuffer(uint64_t size, BufferUsage usage);
+  Buffer CreateBufferFromData(const void* data,
+                              uint64_t size,
+                              BufferUsage usage = BufferUsage::Storage);
 
   template<typename T>
-  wgpu::Buffer CreateBufferFromStruct(
-      const T& obj,
-      wgpu::BufferUsage usage = wgpu::BufferUsage::Storage) {
+  Buffer CreateBufferFromStruct(const T& obj,
+                                BufferUsage usage = BufferUsage::Storage) {
     return CreateBufferFromData(&obj, sizeof(T), usage);
   }
 
   template<typename T>
-  wgpu::Buffer CreateBufferFromVector(
-      const std::vector<T>& vec,
-      DataType dataType = GetDataType<T>(),
-      wgpu::BufferUsage usage = wgpu::BufferUsage::Storage) {
+  Buffer CreateBufferFromVector(const std::vector<T>& vec,
+                                DataType dataType = GetDataType<T>(),
+                                BufferUsage usage = BufferUsage::Storage) {
     assert(sizeof(T) == SizeOf(dataType));
     return CreateBufferFromData(vec.data(), vec.size() * sizeof(T), usage);
   }
 
   template<typename T, typename = std::enable_if_t<std::is_scalar_v<T>>>
-  wgpu::Buffer CreateBufferFromScalar(
-      T data,
-      DataType dataType = GetDataType<T>(),
-      wgpu::BufferUsage usage = wgpu::BufferUsage::Uniform) {
+  Buffer CreateBufferFromScalar(T data,
+                                DataType dataType = GetDataType<T>(),
+                                BufferUsage usage = BufferUsage::Uniform) {
     if (sizeof(T) == SizeOf(dataType))
       return CreateBufferFromData(&data, sizeof(T), usage);
     switch (dataType) {
@@ -80,11 +75,11 @@ class Device {
     }
   }
 
-  wgpu::Buffer CopyToStagingBuffer(const wgpu::Buffer& buffer);
-  void CopyBufferToBuffer(const wgpu::Buffer& src, const wgpu::Buffer& dst);
-  void WriteBuffer(void* data, size_t size, wgpu::Buffer* buffer);
-  wgpu::Future ReadStagingBuffer(const wgpu::Buffer& buffer,
-                                 std::function<void(const void* data)> cb);
+  Buffer CopyToStagingBuffer(const Buffer& buffer);
+  void WriteBuffer(void* data, uint64_t size, Buffer& buffer);
+  wgpu::Future ReadFullStagingBuffer(
+      const Buffer& buffer,
+      std::function<void(const void* data, uint64_t size, uint64_t offset)> cb);
 
   const wgpu::ShaderModule& CreateShaderModule(
       const char* name,
@@ -92,7 +87,7 @@ class Device {
   const wgpu::ComputePipeline& CreateKernel(const wgpu::ShaderModule& shader,
                                             const char* entryPoint);
   wgpu::BindGroup CreateBindGroup(const wgpu::ComputePipeline& kernel,
-                                  std::vector<wgpu::Buffer> buffers);
+                                  std::vector<Buffer> buffers);
   void RunKernel(const wgpu::ComputePipeline& kernel,
                  const wgpu::BindGroup& bindGroup,
                  Dims3 workgroupsCount);
@@ -105,6 +100,8 @@ class Device {
  private:
   void EnsureEncoder();
   void EndEncoding();
+  void CopyBufferToBuffer(const wgpu::Buffer& src,
+                          const wgpu::Buffer& dst);
   wgpu::Future AddFuture(const wgpu::Future& future);
 
   static void PollingThread(Device* self);
@@ -127,10 +124,6 @@ class Device {
 
   std::set<uint64_t> futures_;
 };
-
-// Allow users to avoid the wgpu namespace in their code.
-using Buffer = wgpu::Buffer;
-using BufferUsage = wgpu::BufferUsage;
 
 }  // namespace betann
 

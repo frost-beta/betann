@@ -61,7 +61,7 @@ void ArrayRange(Device& device,
                 double start,
                 double step,
                 DataType dataType,
-                const wgpu::Buffer& out) {
+                const Buffer& out) {
   const uint32_t workgroupSize = 64;
   uint32_t outNumElements = out.GetSize() / SizeOf(dataType);
   RunKernel(device,
@@ -86,11 +86,11 @@ void BinaryOpContiguous(Device& device,
                         const char* name,
                         BinaryOpType type,
                         DataType outputDataType,
-                        const wgpu::Buffer& output,
+                        const Buffer& output,
                         uint32_t outputNumElements,
                         DataType inputDataType,
-                        const wgpu::Buffer& a,
-                        const wgpu::Buffer& b) {
+                        const Buffer& a,
+                        const Buffer& b) {
   const uint32_t workgroupSize = 64;  // TODO(zcbenz): make it dynamic
   uint32_t maxThreadsPerGridDim =
       device.GetLimits().maxComputeWorkgroupsPerDimension * workgroupSize;
@@ -136,12 +136,12 @@ void BinaryOpContiguous(Device& device,
 void BinaryOpGeneral(Device& device,
                      const char* name,
                      DataType outputDataType,
-                     const wgpu::Buffer& output,
+                     const Buffer& output,
                      const std::vector<uint32_t>& shapePre,
                      DataType inputDataType,
-                     const wgpu::Buffer& a,
+                     const Buffer& a,
                      const std::vector<uint32_t>& aStridesPre,
-                     const wgpu::Buffer& b,
+                     const Buffer& b,
                      const std::vector<uint32_t>& bStridesPre) {
   auto [shape, aStrides, bStrides] =
       CollapseContiguousDims(shapePre, aStridesPre, bStridesPre);
@@ -186,10 +186,10 @@ void BinaryOpGeneral(Device& device,
 void CopyContiguous(Device& device,
                     CopyType type,
                     DataType dstDataType,
-                    const wgpu::Buffer& dst,
+                    const Buffer& dst,
                     uint32_t dstNumElements,
                     DataType srcDataType,
-                    const wgpu::Buffer& src) {
+                    const Buffer& src) {
   const uint32_t workgroupSize = 64;  // TODO(zcbenz): make it dynamic
   uint32_t maxThreadsPerGridDim =
       device.GetLimits().maxComputeWorkgroupsPerDimension * workgroupSize;
@@ -224,9 +224,9 @@ void CopyContiguous(Device& device,
 
 void CopyGeneral(Device& device,
                  DataType dstDataType,
-                 const wgpu::Buffer& dst,
+                 const Buffer& dst,
                  DataType srcDataType,
-                 const wgpu::Buffer& src,
+                 const Buffer& src,
                  const std::vector<uint32_t>& srcShapePre,
                  const std::vector<uint32_t>& srcStridesPre) {
   auto [srcShape, srcStrides] =
@@ -266,10 +266,10 @@ void CopyGeneral(Device& device,
 
 void CopyGeneralBoth(Device& device,
                      DataType dstDataType,
-                     const wgpu::Buffer& dst,
+                     const Buffer& dst,
                      const std::vector<uint32_t>& dstStridesPre,
                      DataType srcDataType,
-                     const wgpu::Buffer& src,
+                     const Buffer& src,
                      const std::vector<uint32_t>& srcShapePre,
                      const std::vector<uint32_t>& srcStridesPre) {
   auto [srcShape, srcStrides, dstStrides] =
@@ -310,9 +310,9 @@ void CopyGeneralBoth(Device& device,
 
 void RandomBitsContiguous(Device& device,
                           DataType outDataType,
-                          const wgpu::Buffer& out,
+                          const Buffer& out,
                           uint32_t outNumElements,
-                          const wgpu::Buffer& keys,
+                          const Buffer& keys,
                           uint32_t keysNumElements) {
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
   uint32_t numKeys = keysNumElements / 2;  // each key consists of 2 items
@@ -339,9 +339,9 @@ void RandomBitsContiguous(Device& device,
 
 void RandomBitsGeneral(Device& device,
                        DataType outDataType,
-                       const wgpu::Buffer& out,
+                       const Buffer& out,
                        uint32_t outNumElements,
-                       const wgpu::Buffer& keys,
+                       const Buffer& keys,
                        const std::vector<uint32_t>& keysShape,
                        const std::vector<uint32_t>& keysStrides) {
   const uint32_t workgroupSize = 8;  // TODO(zcbenz): make it dynamic
@@ -379,10 +379,10 @@ void SortBlock(Device& device,
                uint32_t axis,
                SortInputType inputType,
                SortResultType resultType,
-               const wgpu::Buffer& out,
+               const Buffer& out,
                const std::vector<uint32_t>& outStrides,
                DataType inputDataType,
-               const wgpu::Buffer& input,
+               const Buffer& input,
                const std::vector<uint32_t>& inputShape,
                const std::vector<uint32_t>& inputStrides) {
   uint32_t sizeSortedAxis = inputShape[axis];
@@ -396,7 +396,7 @@ void SortBlock(Device& device,
     ret.erase(ret.begin() + axis);
     return ret;
   };
-  std::vector<wgpu::Buffer> buffers = {
+  std::vector<Buffer> buffers = {
       out,
       device.CreateBufferFromScalar(sizeSortedAxis),
       device.CreateBufferFromScalar(outStrides[axis]),
@@ -414,8 +414,8 @@ void SortBlock(Device& device,
   } else {
     auto inputRestShape = removeAxis(inputShape, axis);
     if (inputRestShape.empty()) {
-      wgpu::Buffer zero = device.CreateBufferFromScalar(
-          0, DataType::U32, wgpu::BufferUsage::Storage);
+      Buffer zero = device.CreateBufferFromScalar(
+          0, DataType::U32, BufferUsage::Storage);
       buffers.push_back(zero);
       buffers.push_back(zero);
       buffers.push_back(zero);
@@ -450,9 +450,9 @@ void SortBlock(Device& device,
 void UnaryOpContiguous(Device& device,
                        const char* name,
                        DataType outputDataType,
-                       const wgpu::Buffer& output,
+                       const Buffer& output,
                        DataType inputDataType,
-                       const wgpu::Buffer& input,
+                       const Buffer& input,
                        uint32_t inputNumElements) {
   const uint32_t workgroupSize = 64;  // TODO(zcbenz): make it dynamic
   uint32_t maxThreadsPerGridDim =
@@ -492,9 +492,9 @@ void UnaryOpContiguous(Device& device,
 void UnaryOpGeneral(Device& device,
                     const char* name,
                     DataType outputDataType,
-                    const wgpu::Buffer& output,
+                    const Buffer& output,
                     DataType inputDataType,
-                    const wgpu::Buffer& input,
+                    const Buffer& input,
                     const std::vector<uint32_t>& inputShapePre,
                     const std::vector<uint32_t>& inputStridesPre) {
   auto [inputShape, inputStrides] =
