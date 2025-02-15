@@ -20,6 +20,7 @@ target_sources(betann PRIVATE betann/device.cc
                              BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
                              FILES betann/betann.h
                                    betann/device.h
+                                   betann/data_type.h
                                    betann/math.h
                                    betann/matmul.h
                                    betann/kernels.h

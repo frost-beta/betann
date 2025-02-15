@@ -415,7 +415,7 @@ void SortBlock(Device& device,
     auto inputRestShape = removeAxis(inputShape, axis);
     if (inputRestShape.empty()) {
       wgpu::Buffer zero = device.CreateBufferFromScalar(
-          0, DataType::u32, wgpu::BufferUsage::Storage);
+          0, DataType::U32, wgpu::BufferUsage::Storage);
       buffers.push_back(zero);
       buffers.push_back(zero);
       buffers.push_back(zero);
@@ -458,8 +458,8 @@ void UnaryOpContiguous(Device& device,
   uint32_t maxThreadsPerGridDim =
       device.GetLimits().maxComputeWorkgroupsPerDimension * workgroupSize;
   bool use2DGrid = inputNumElements > maxThreadsPerGridDim;
-  bool inputIsIntegral = inputDataType == DataType::u32 ||
-                         inputDataType == DataType::i32;
+  bool inputIsIntegral = inputDataType == DataType::U32 ||
+                         inputDataType == DataType::I32;
   RunKernel(device,
             fmt::format("unary_{}_{}", use2DGrid ? "v2" : "v", name),
             fmt::format("unary_{}_{}_{}",

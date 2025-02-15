@@ -9,6 +9,7 @@
 
 #include <webgpu/webgpu_cpp.h>
 
+#include "betann/data_type.h"
 #include "betann/utils.h"
 
 namespace betann {
@@ -59,20 +60,20 @@ class Device {
     if (sizeof(T) == SizeOf(dataType))
       return CreateBufferFromData(&data, sizeof(T), usage);
     switch (dataType) {
-      case DataType::bool_:
-      case DataType::u32: {
+      case DataType::Bool:
+      case DataType::U32: {
         uint32_t native = static_cast<uint32_t>(data);
         return CreateBufferFromData(&native, SizeOf(dataType), usage);
       }
-      case DataType::i32: {
+      case DataType::I32: {
         int32_t native = static_cast<int32_t>(data);
         return CreateBufferFromData(&native, SizeOf(dataType), usage);
       }
-      case DataType::f32: {
+      case DataType::F32: {
         float native = static_cast<float>(data);
         return CreateBufferFromData(&native, SizeOf(dataType), usage);
       }
-      case DataType::f16: {
+      case DataType::F16: {
         uint64_t native = Float32ToFloat16(static_cast<float>(data));
         return CreateBufferFromData(&native, SizeOf(dataType), usage);
       }

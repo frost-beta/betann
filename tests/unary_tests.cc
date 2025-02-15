@@ -59,7 +59,7 @@ TEST_F(UnaryTests, SpecialTypes) {
                     betann::Float32ToFloat16(0.89),
                     betann::Float32ToFloat16(0.64),
                   },
-                  betann::DataType::f16),
+                  betann::DataType::F16),
               (std::vector<uint16_t>{
                   betann::Float32ToFloat16(2.43555),
                   betann::Float32ToFloat16(1.89648),

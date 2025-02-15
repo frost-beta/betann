@@ -61,7 +61,7 @@ void MatrixVectorMultiply(Device& device,
     enableSubgroups = false;
   }
 #endif
-  if (enableSubgroups && dataType == DataType::f16) {
+  if (enableSubgroups && dataType == DataType::F16) {
     enableSubgroups = device.SupportsF16() && device.SupportsSubgroupsF16();
     enableSubgroupsF16 = enableSubgroups;
   }
@@ -166,7 +166,7 @@ void MatrixMultiply(Device& device,
   if (a.GetSize() == 0 || b.GetSize() == 0) {
     CopyContiguous(device, CopyType::Scalar,
                    dataType, out, out.GetSize() / SizeOf(dataType),
-                   DataType::u32, device.CreateBufferFromScalar(0u));
+                   DataType::U32, device.CreateBufferFromScalar(0u));
     return;
   }
 
