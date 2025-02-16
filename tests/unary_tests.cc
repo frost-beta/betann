@@ -69,7 +69,13 @@ TEST_F(UnaryTests, F16) {
 }
 
 TEST_F(UnaryTests, Bool) {
+  // ![true, false]
   EXPECT_EQ(RunUnaryOpsContiguous<uint32_t>("logical_not",
+                                            std::vector<char>{true, false},
+                                            betann::DataType::U32),
+            (std::vector<uint32_t>{0, 1}));
+  // ~[true, false]
+  EXPECT_EQ(RunUnaryOpsContiguous<uint32_t>("bitwise_invert",
                                             std::vector<char>{true, false},
                                             betann::DataType::U32),
             (std::vector<uint32_t>{0, 1}));

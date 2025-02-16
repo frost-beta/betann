@@ -56,6 +56,16 @@ fn betann_atanh(input: input_dtype) -> return_dtype {
   }
 }
 
+if (!$input_is_floating) {
+  fn betann_bitwise_invert(input: input_dtype) -> return_dtype {
+    if ($input_is_bool) {
+      return return_dtype(!bool(input));
+    } else {
+      return return_dtype(~input);
+    }
+  }
+}
+
 fn betann_ceil(input: input_dtype) -> input_dtype {
   if ($input_is_floating) {
     return ceil(input);

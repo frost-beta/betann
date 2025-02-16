@@ -18,7 +18,7 @@ class BinaryTests : public BetaNNTests {
                                betann::GetDataType<T>(),
                                output,
                                outputNumElements,
-                               betann::GetDataType<D>(),
+                               betann::GetDataType<I>(),
                                device_.CreateBufferTransformTo<D>(a),
                                device_.CreateBufferTransformTo<D>(b));
     device_.Flush();
@@ -42,7 +42,7 @@ class BinaryTests : public BetaNNTests {
                             betann::GetDataType<T>(),
                             output,
                             shape,
-                            betann::GetDataType<D>(),
+                            betann::GetDataType<I>(),
                             device_.CreateBufferTransformTo<D>(a),
                             aStrides,
                             device_.CreateBufferTransformTo<D>(b),
@@ -53,12 +53,30 @@ class BinaryTests : public BetaNNTests {
 };
 
 TEST_F(BinaryTests, Bool) {
+  // 89 > 64
   std::vector<uint32_t> result = RunBinaryOpContiguous<uint32_t, float>(
-      betann::BinaryOpType::ScalarScalar, "greater", {89}, {64});
+      betann::BinaryOpType::ScalarScalar,
+      "greater",
+      {89}, {64});
   EXPECT_EQ(result, (std::vector<uint32_t>{true}));
+  // [true, true] == [true, false]
   result = RunBinaryOpContiguous<uint32_t, uint32_t, char>(
-      betann::BinaryOpType::VectorVector, "equal", {true, true}, {true, false});
+      betann::BinaryOpType::VectorVector,
+      "equal",
+      {true, true}, {true, false});
   EXPECT_EQ(result, (std::vector<uint32_t>{true, false}));
+  // [true, false] && [false, false]
+  result = RunBinaryOpContiguous<uint32_t, uint32_t, char>(
+      betann::BinaryOpType::ScalarScalar,
+      "logical_and",
+      {true, false}, {false, false});
+  EXPECT_EQ(result, (std::vector<uint32_t>{false, false}));
+  // [true, false] & [true, false]
+  result = RunBinaryOpContiguous<uint32_t, uint32_t, char>(
+      betann::BinaryOpType::ScalarScalar,
+      "bitwise_and",
+      {true, false}, {false, false});
+  EXPECT_EQ(result, (std::vector<uint32_t>{false, false}));
 }
 
 TEST_F(BinaryTests, SmallArrays) {

@@ -117,15 +117,21 @@ void BinaryOpContiguous(Device& device,
                         WgslType(outputDataType),
                         WgslType(inputDataType)),
             [&]() {
-              return Append(ParseTemplate(
-                                wgsl_source_binary_contiguous,
-                                {
-                                  {"enable_f16", device.SupportsF16()},
-                                  {"output_dtype", WgslType(outputDataType)},
-                                  {"input_dtype", WgslType(inputDataType)},
-                                  {"op", name},
-                                }),
-                            wgsl_source_binary_ops);
+              return Append(
+                  ParseTemplate(
+                      wgsl_source_binary_contiguous,
+                      {
+                        {"enable_f16", device.SupportsF16()},
+                        {"output_dtype", WgslType(outputDataType)},
+                        {"input_dtype", WgslType(inputDataType)},
+                        {"op", name},
+                      }),
+                  ParseTemplate(
+                      wgsl_source_binary_ops,
+                      {
+                        {"input_is_floating", IsFloating(inputDataType)},
+                        {"input_is_integer", IsInteger(inputDataType)},
+                      }));
             },
             {output, a, b},
             GetWorkgroupsCountContiguous(outputNumElements,
@@ -158,16 +164,22 @@ void BinaryOpGeneral(Device& device,
                         WgslType(outputDataType),
                         WgslType(inputDataType)),
             [&]() {
-              return Append(ParseTemplate(
-                                wgsl_source_binary_general,
-                                {
-                                  {"enable_f16", device.SupportsF16()},
-                                  {"output_dtype", WgslType(outputDataType)},
-                                  {"input_dtype", WgslType(inputDataType)},
-                                  {"op", name},
-                                }),
-                            wgsl_source_binary_ops,
-                            wgsl_source_utils);
+              return Append(
+                  ParseTemplate(
+                      wgsl_source_binary_general,
+                      {
+                        {"enable_f16", device.SupportsF16()},
+                        {"output_dtype", WgslType(outputDataType)},
+                        {"input_dtype", WgslType(inputDataType)},
+                        {"op", name},
+                      }),
+                  ParseTemplate(
+                      wgsl_source_binary_ops,
+                      {
+                        {"input_is_floating", IsFloating(inputDataType)},
+                        {"input_is_integer", IsInteger(inputDataType)},
+                      }),
+                  wgsl_source_utils);
             },
             {
               output,
@@ -479,6 +491,7 @@ void UnaryOpContiguous(Device& device,
                   ParseTemplate(
                       wgsl_source_unary_ops,
                       {
+                        {"input_is_bool", inputDataType == DataType::Bool},
                         {"input_is_floating", IsFloating(inputDataType)},
                         {"input_is_unsigned", IsUnsigned(inputDataType)},
                       }));
@@ -521,6 +534,7 @@ void UnaryOpGeneral(Device& device,
                   ParseTemplate(
                       wgsl_source_unary_ops,
                       {
+                        {"input_is_bool", inputDataType == DataType::Bool},
                         {"input_is_floating", IsFloating(inputDataType)},
                         {"input_is_unsigned", IsUnsigned(inputDataType)},
                       }),

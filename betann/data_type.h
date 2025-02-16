@@ -23,6 +23,10 @@ constexpr bool IsFloating(DataType dataType) {
   return dataType == DataType::F32 || dataType == DataType::F16;
 }
 
+constexpr bool IsInteger(DataType dataType) {
+  return dataType == DataType::I32 || dataType == DataType::U32;
+}
+
 constexpr bool IsUnsigned(DataType dataType) {
   return dataType == DataType::Bool || dataType == DataType::U32;
 }
