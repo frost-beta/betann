@@ -29,7 +29,9 @@ class Device {
   void WaitFor(const wgpu::Future& future);
   void WaitAll();
 
-  Buffer CreateBuffer(uint64_t size, BufferUsage usage);
+  Buffer CreateBuffer(uint64_t size,
+                      BufferUsage usage,
+                      bool mappedAtCreation = false);
   Buffer CreateBufferFromData(const void* data,
                               uint64_t size,
                               BufferUsage usage = BufferUsage::Storage);
@@ -73,6 +75,24 @@ class Device {
         return CreateBufferFromData(&native, SizeOf(dataType), usage);
       }
     }
+  }
+
+  template<typename T, typename U>
+  Buffer CreateBufferTransformTo(const U* src,
+                                 size_t srcNumElements,
+                                 BufferUsage usage = BufferUsage::Storage) {
+    Buffer buffer = CreateBuffer(sizeof(T) * srcNumElements, usage, true);
+    std::transform(src, src + srcNumElements,
+                   static_cast<T*>(buffer.data.GetMappedRange()),
+                   [](U item) { return static_cast<T>(item); });
+    buffer.data.Unmap();
+    return buffer;
+  }
+
+  template<typename T, typename U>
+  Buffer CreateBufferTransformTo(const std::vector<U>& vec,
+                                 BufferUsage usage = BufferUsage::Storage) {
+    return CreateBufferTransformTo<T>(vec.data(), vec.size(), usage);
   }
 
   void WriteBuffer(void* data, uint64_t size, Buffer& buffer);

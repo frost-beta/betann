@@ -24,13 +24,13 @@ constexpr bool IsFloating(DataType dataType) {
 }
 
 constexpr bool IsUnsigned(DataType dataType) {
-  return dataType == DataType::U32;
+  return dataType == DataType::Bool || dataType == DataType::U32;
 }
 
 constexpr const char* WgslType(DataType dataType) {
   switch (dataType) {
     case DataType::Bool:
-      return "bool";
+      return "u32";  // the "bool" type is non-host-shareable in WGSL.
     case DataType::I32:
       return "i32";
     case DataType::U32:
@@ -50,7 +50,11 @@ template<> inline DataType GetDataType<bool>() { return DataType::Bool; }
 template<> inline DataType GetDataType<int32_t>() { return DataType::I32; }
 template<> inline DataType GetDataType<uint32_t>() { return DataType::U32; }
 template<> inline DataType GetDataType<float>() { return DataType::F32; }
+// There is no native float16 type until C++23, so use uint16_t as a placeholder
+// as WGSL does not have u16 yet.
 template<> inline DataType GetDataType<uint16_t>() { return DataType::F16; }
+// The char is treated as bool in case of infamous std::vector<bool>.
+template<> inline DataType GetDataType<char>() { return DataType::Bool; }
 
 }  // namespace betann
 

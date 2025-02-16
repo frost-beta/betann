@@ -6,28 +6,28 @@ fn divide(a: input_dtype, b: input_dtype) -> output_dtype {
   return output_dtype(a / b);
 }
 
-fn equal(a: input_dtype, b: input_dtype) -> bool {
-  return a == b;
+fn equal(a: input_dtype, b: input_dtype) -> output_dtype {
+  return output_dtype(a == b);
 }
 
-fn greater(a: input_dtype, b: input_dtype) -> bool {
-  return a > b;
+fn greater(a: input_dtype, b: input_dtype) -> output_dtype {
+  return output_dtype(a > b);
 }
 
-fn greater_equal(a: input_dtype, b: input_dtype) -> bool {
-  return a >= b;
+fn greater_equal(a: input_dtype, b: input_dtype) -> output_dtype {
+  return output_dtype(a >= b);
 }
 
-fn less(a: input_dtype, b: input_dtype) -> bool {
-  return a < b;
+fn less(a: input_dtype, b: input_dtype) -> output_dtype {
+  return output_dtype(a < b);
 }
 
-fn less_equal(a: input_dtype, b: input_dtype) -> bool {
-  return a <= b;
+fn less_equal(a: input_dtype, b: input_dtype) -> output_dtype {
+  return output_dtype(a <= b);
 }
 
-fn not_equal(a: input_dtype, b: input_dtype) -> bool {
-  return a != b;
+fn not_equal(a: input_dtype, b: input_dtype) -> output_dtype {
+  return output_dtype(a != b);
 }
 
 fn log_add_exp(a: input_dtype, b: input_dtype) -> output_dtype {

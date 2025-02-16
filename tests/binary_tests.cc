@@ -2,7 +2,7 @@
 
 class BinaryTests : public BetaNNTests {
  public:
-  template<typename T, typename I>
+  template<typename T, typename D, typename I = D>
   std::vector<T> RunBinaryOpContiguous(betann::BinaryOpType type,
                                        const char* name,
                                        const std::vector<I>& a,
@@ -18,14 +18,14 @@ class BinaryTests : public BetaNNTests {
                                betann::GetDataType<T>(),
                                output,
                                outputNumElements,
-                               betann::GetDataType<I>(),
-                               device_.CreateBufferFromVector(a),
-                               device_.CreateBufferFromVector(b));
+                               betann::GetDataType<D>(),
+                               device_.CreateBufferTransformTo<D>(a),
+                               device_.CreateBufferTransformTo<D>(b));
     device_.Flush();
     return ReadFromBuffer<T>(output, outputNumElements);
   }
 
-  template<typename T, typename I>
+  template<typename T, typename D, typename I = D>
   std::vector<T> RunBinaryOpGeneral(const char* name,
                                     const std::vector<uint32_t>& shape,
                                     const std::vector<I>& a,
@@ -42,15 +42,24 @@ class BinaryTests : public BetaNNTests {
                             betann::GetDataType<T>(),
                             output,
                             shape,
-                            betann::GetDataType<I>(),
-                            device_.CreateBufferFromVector(a),
+                            betann::GetDataType<D>(),
+                            device_.CreateBufferTransformTo<D>(a),
                             aStrides,
-                            device_.CreateBufferFromVector(b),
+                            device_.CreateBufferTransformTo<D>(b),
                             bStrides);
     device_.Flush();
     return ReadFromBuffer<T>(output, outputNumElements);
   }
 };
+
+TEST_F(BinaryTests, Bool) {
+  std::vector<uint32_t> result = RunBinaryOpContiguous<uint32_t, float>(
+      betann::BinaryOpType::ScalarScalar, "greater", {89}, {64});
+  EXPECT_EQ(result, (std::vector<uint32_t>{true}));
+  result = RunBinaryOpContiguous<uint32_t, uint32_t, char>(
+      betann::BinaryOpType::VectorVector, "equal", {true, true}, {true, false});
+  EXPECT_EQ(result, (std::vector<uint32_t>{true, false}));
+}
 
 TEST_F(BinaryTests, SmallArrays) {
   std::vector<float> ss = RunBinaryOpContiguous<float, uint32_t>(

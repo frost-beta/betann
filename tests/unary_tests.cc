@@ -6,8 +6,7 @@ class UnaryTests : public BetaNNTests {
   std::vector<T> RunUnaryOpsContiguous(
       const char* op,
       const std::vector<U>& input,
-      betann::DataType outputDataType = betann::GetDataType<T>(),
-      betann::DataType inputDataType = betann::GetDataType<U>()) {
+      betann::DataType outputDataType = betann::GetDataType<T>()) {
     betann::Buffer out = device_.CreateBuffer(
         input.size() * SizeOf(outputDataType),
         betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
@@ -16,8 +15,8 @@ class UnaryTests : public BetaNNTests {
         op,
         outputDataType,
         out,
-        inputDataType,
-        device_.CreateBufferFromVector(input, inputDataType),
+        betann::GetDataType<U>(),
+        device_.CreateBufferTransformTo<T>(input),
         input.size());
     device_.Flush();
     return ReadFromBuffer<T>(out, input.size());
@@ -29,8 +28,7 @@ class UnaryTests : public BetaNNTests {
       const std::vector<U>& input,
       const std::vector<uint32_t>& inputShape,
       const std::vector<uint32_t>& inputStrides,
-      betann::DataType outputDataType = betann::GetDataType<T>(),
-      betann::DataType inputDataType = betann::GetDataType<U>()) {
+      betann::DataType outputDataType = betann::GetDataType<T>()) {
     betann::Buffer out = device_.CreateBuffer(
         betann::NumElements(inputShape, inputStrides) * SizeOf(outputDataType),
         betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
@@ -39,8 +37,8 @@ class UnaryTests : public BetaNNTests {
         op,
         outputDataType,
         out,
-        inputDataType,
-        device_.CreateBufferFromVector(input, inputDataType),
+        betann::GetDataType<U>(),
+        device_.CreateBufferTransformTo<T>(input),
         inputShape,
         inputStrides);
     device_.Flush();
@@ -48,23 +46,33 @@ class UnaryTests : public BetaNNTests {
   }
 };
 
-TEST_F(UnaryTests, SpecialTypes) {
+TEST_F(UnaryTests, Overflow) {
   EXPECT_EQ(RunUnaryOpsContiguous<uint32_t>("negative",
                                             std::vector<uint32_t>{100}),
             (std::vector<uint32_t>{4294967196}));
-  if (device_.SupportsF16()) {
-    EXPECT_EQ(RunUnaryOpsContiguous<uint16_t>(
-                  "exp",
-                  std::vector<uint16_t>{
-                    betann::Float32ToFloat16(0.89),
-                    betann::Float32ToFloat16(0.64),
-                  },
-                  betann::DataType::F16),
-              (std::vector<uint16_t>{
-                  betann::Float32ToFloat16(2.43555),
-                  betann::Float32ToFloat16(1.89648),
-              }));
-  }
+}
+
+TEST_F(UnaryTests, F16) {
+  if (!device_.SupportsF16())
+    return;
+  EXPECT_EQ(RunUnaryOpsContiguous<uint16_t>(
+                "exp",
+                std::vector<uint16_t>{
+                  betann::Float32ToFloat16(0.89),
+                  betann::Float32ToFloat16(0.64),
+                },
+                betann::DataType::F16),
+            (std::vector<uint16_t>{
+                betann::Float32ToFloat16(2.43555),
+                betann::Float32ToFloat16(1.89648),
+            }));
+}
+
+TEST_F(UnaryTests, Bool) {
+  EXPECT_EQ(RunUnaryOpsContiguous<uint32_t>("logical_not",
+                                            std::vector<char>{true, false},
+                                            betann::DataType::U32),
+            (std::vector<uint32_t>{0, 1}));
 }
 
 TEST_F(UnaryTests, Contiguous) {

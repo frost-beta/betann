@@ -155,24 +155,23 @@ void Device::WaitAll() {
   }
 }
 
-Buffer Device::CreateBuffer(uint64_t size, BufferUsage usage) {
+Buffer Device::CreateBuffer(uint64_t size,
+                            BufferUsage usage,
+                            bool mappedAtCreation) {
   wgpu::BufferDescriptor descriptor;
   descriptor.usage = usage;
   descriptor.size = size;
+  descriptor.mappedAtCreation = mappedAtCreation;
   return {device_.CreateBuffer(&descriptor)};
 }
 
 Buffer Device::CreateBufferFromData(const void* data,
                                     uint64_t size,
                                     BufferUsage usage) {
-  wgpu::BufferDescriptor descriptor;
-  descriptor.usage = usage;
-  descriptor.size = size;
-  descriptor.mappedAtCreation = true;
-  wgpu::Buffer buffer = device_.CreateBuffer(&descriptor);
-  memcpy(buffer.GetMappedRange(), data, size);
-  buffer.Unmap();
-  return {std::move(buffer)};
+  Buffer buffer = CreateBuffer(size, usage, true);
+  memcpy(buffer.data.GetMappedRange(), data, size);
+  buffer.data.Unmap();
+  return buffer;
 }
 
 void Device::WriteBuffer(void* data, uint64_t size, Buffer& buffer) {
