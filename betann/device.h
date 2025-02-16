@@ -75,11 +75,14 @@ class Device {
     }
   }
 
-  Buffer CopyToStagingBuffer(const Buffer& buffer);
   void WriteBuffer(void* data, uint64_t size, Buffer& buffer);
-  wgpu::Future ReadFullStagingBuffer(
-      const Buffer& buffer,
-      std::function<void(const void* data, uint64_t size, uint64_t offset)> cb);
+
+  // Read the buffer by copying to a staging buffer first and then mapping,
+  // simulnateous reads will be merged into one. This method is NOT thread-safe.
+  using ReadBufferCallback = std::function<void(const void* data,
+                                                uint64_t size,
+                                                uint64_t offset)>;
+  wgpu::Future ReadBuffer(const Buffer& buffer, ReadBufferCallback cb);
 
   const wgpu::ShaderModule& CreateShaderModule(
       const char* name,
@@ -100,8 +103,7 @@ class Device {
  private:
   void EnsureEncoder();
   void EndEncoding();
-  void CopyBufferToBuffer(const wgpu::Buffer& src,
-                          const wgpu::Buffer& dst);
+  Buffer CopyToStagingBuffer(const Buffer& buffer);
   wgpu::Future AddFuture(const wgpu::Future& future);
 
   static void PollingThread(Device* self);
@@ -110,18 +112,28 @@ class Device {
   wgpu::Adapter adapter_;
   wgpu::Device device_;
   wgpu::Queue queue_;
+
+  // Device capacity.
   wgpu::Limits limits_;
   bool supportsF16_ = false;
   bool supportsSubgroups_ = false;
   bool supportsSubgroupsF16_ = false;
 
+  // Cached shaders and kernels.
   std::map<std::string, wgpu::ShaderModule> modules_;
   std::map<std::pair<WGPUShaderModule, std::string>,
            wgpu::ComputePipeline> kernels_;
 
+  // Current command encoder and unsubmitted commands.
   wgpu::CommandEncoder encoder_;
   std::vector<wgpu::CommandBuffer> commands_;
 
+  // Buffers being read.
+  std::map<WGPUBuffer,
+           std::pair<wgpu::Future,
+                     std::vector<ReadBufferCallback>>> pendingReadBuffers_;
+
+  // Tasks to be waited for.
   std::set<uint64_t> futures_;
 };
 

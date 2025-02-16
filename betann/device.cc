@@ -175,34 +175,41 @@ Buffer Device::CreateBufferFromData(const void* data,
   return {std::move(buffer)};
 }
 
-Buffer Device::CopyToStagingBuffer(const Buffer& buffer) {
-  Buffer staging = CreateBuffer(buffer.GetSize(), BufferUsage::MapRead |
-                                                  BufferUsage::CopyDst);
-  staging.size = buffer.size;
-  staging.offset = buffer.offset;
-  CopyBufferToBuffer(buffer.data, staging.data);
-  return staging;
-}
-
 void Device::WriteBuffer(void* data, uint64_t size, Buffer& buffer) {
   queue_.WriteBuffer(buffer.data, buffer.offset, data, size);
 }
 
-wgpu::Future Device::ReadFullStagingBuffer(
-    const Buffer& buffer,
-    std::function<void(const void* data, uint64_t size, uint64_t offset)> cb) {
-  return AddFuture(buffer.data.MapAsync(
+wgpu::Future Device::ReadBuffer(const Buffer& buffer, ReadBufferCallback cb) {
+  // Merge simultaneous read.
+  WGPUBuffer key = buffer.data.Get();
+  auto it = pendingReadBuffers_.find(key);
+  if (it != pendingReadBuffers_.end()) {
+    it->second.second.push_back(std::move(cb));
+    return it->second.first;
+  }
+  // Create a staging buffer and copy to it.
+  Buffer staging = CopyToStagingBuffer(buffer);
+  Flush();
+  // Map the buffer and read.
+  wgpu::Future future = AddFuture(staging.data.MapAsync(
       wgpu::MapMode::Read,
       0,
       wgpu::kWholeMapSize,
       wgpu::CallbackMode::WaitAnyOnly,
-      [buffer, cb=std::move(cb)](wgpu::MapAsyncStatus status,
-                                 const char* message) {
+      [this, staging, key](wgpu::MapAsyncStatus status, const char* message) {
         if (status != wgpu::MapAsyncStatus::Success)
           throw std::runtime_error(fmt::format("MapAsync failed: {}", message));
-        cb(buffer.data.GetConstMappedRange(), buffer.GetSize(), buffer.offset);
-        buffer.data.Unmap();
+        // Invoke all the callbacks on the buffer.
+        const void* stagingData = staging.data.GetConstMappedRange();
+        for (const auto& cb : pendingReadBuffers_[key].second) {
+          cb(stagingData, staging.GetSize(), staging.offset);
+        }
+        // Cleanup.
+        staging.data.Unmap();
+        pendingReadBuffers_.erase(key);
       }));
+  pendingReadBuffers_[key] = {future, std::vector{std::move(cb)}};
+  return future;
 }
 
 const wgpu::ShaderModule& Device::CreateShaderModule(
@@ -283,10 +290,15 @@ void Device::EndEncoding() {
   encoder_ = nullptr;
 }
 
-void Device::CopyBufferToBuffer(const wgpu::Buffer& src,
-                                const wgpu::Buffer& dst) {
+Buffer Device::CopyToStagingBuffer(const Buffer& buffer) {
+  uint64_t totalSize = buffer.GetSize();
+  Buffer staging = CreateBuffer(totalSize, BufferUsage::MapRead |
+                                           BufferUsage::CopyDst);
+  staging.size = buffer.size;
+  staging.offset = buffer.offset;
   EnsureEncoder();
-  encoder_.CopyBufferToBuffer(src, 0, dst, 0, src.GetSize());
+  encoder_.CopyBufferToBuffer(buffer.data, 0, staging.data, 0, totalSize);
+  return staging;
 }
 
 wgpu::Future Device::AddFuture(const wgpu::Future& future) {
