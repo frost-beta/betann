@@ -446,14 +446,19 @@ void SortBlock(Device& device,
                         contiguous),
             [&]() {
               return Append(
-                         ParseTemplate(wgsl_source_sort_block,
-                                       {
-                                         {"enable_f16", device.SupportsF16()},
-                                         {"dtype", WgslType(inputDataType)},
-                                         {"argsort", argsort},
-                                         {"contiguous", contiguous},
-                                       }),
-                         wgsl_source_utils);
+                  ParseTemplate(wgsl_source_sort_block,
+                                {
+                                  {"enable_f16", device.SupportsF16()},
+                                  {"dtype", WgslType(inputDataType)},
+                                  {"argsort", argsort},
+                                  {"contiguous", contiguous},
+                                }),
+                  wgsl_source_utils,
+                  ParseTemplate(wgsl_source_constants,
+                                {
+                                  {"enable_f16", device.SupportsF16()},
+                                  {"dtype", WgslType(inputDataType)},
+                                }));
             },
             buffers,
             {1, NumElements(inputShape) / sizeSortedAxis, 1});

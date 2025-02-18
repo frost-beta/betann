@@ -2,7 +2,6 @@
 #define BETANN_MATMUL_H_
 
 #include "betann/device.h"
-#include "betann/utils.h"
 
 namespace betann {
 

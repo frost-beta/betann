@@ -15,6 +15,7 @@ target_sources(betann PRIVATE betann/device.cc
                               betann/math.cc
                               betann/matmul.cc
                               betann/preprocessor.cc
+                              betann/reduce.cc
                               betann/utils.cc
                       PUBLIC FILE_SET HEADERS
                              BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
@@ -42,9 +43,12 @@ set(BETANN_WGSL_SOURCES betann/wgsl/arange.wgsl
                         betann/wgsl/copy_contiguous.wgsl
                         betann/wgsl/copy_general.wgsl
                         betann/wgsl/copy_general_both.wgsl
+                        betann/wgsl/constants.wgsl
                         betann/wgsl/gemv.wgsl
                         betann/wgsl/gemvt.wgsl
                         betann/wgsl/random.wgsl
+                        betann/wgsl/reduce_all.wgsl
+                        betann/wgsl/reduce_ops.wgsl
                         betann/wgsl/sort_block.wgsl
                         betann/wgsl/unary_contiguous.wgsl
                         betann/wgsl/unary_general.wgsl
@@ -120,6 +124,7 @@ if (BETANN_BUILD_TESTS)
                               tests/gemv_tests.cc
                               tests/matmul_tests.cc
                               tests/random_tests.cc
+                              tests/reduce_tests.cc
                               tests/sort_tests.cc
                               tests/unary_tests.cc)
   target_link_libraries(betann_tests PRIVATE betann

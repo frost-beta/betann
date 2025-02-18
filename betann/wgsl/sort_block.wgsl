@@ -45,7 +45,7 @@ fn sort_block(@builtin(workgroup_id) tid: vec3<u32>,
 
   // Copy into workgroup memory.
   for (var i = lid.x; i < n_per_block; i += num_threads) {
-    workgroup_vals[i] = select(dtype_max_value(),
+    workgroup_vals[i] = select(get_max_value_$dtype(),
                                input[input_idx + i * input_stride_sorted_axis],
                                i < size_sorted_axis);
     if ($argsort) {
@@ -198,15 +198,5 @@ fn compare_op(a: dtype, b: dtype) -> bool {
   return a < b;
 }
 
-const max_i32 = 0x7fffffffi;
-const max_u32 = 0xffffffffu;
-const max_f32 = 0x1.fffffep+127f;
-if ($enable_f16) {
-  const max_f16 = 0x1.ffcp+15h;
-}
-
-fn dtype_max_value() -> dtype {
-  return max_$dtype;
-}
-
 // include utils.wgsl
+// include constants.wgsl
