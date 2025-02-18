@@ -36,3 +36,29 @@ fn reduce_op_min(a: output_dtype, b: output_dtype) -> output_dtype {
 fn reduce_op_max(a: output_dtype, b: output_dtype) -> output_dtype {
   return max(a, b);
 }
+
+if ($enable_subgroups) {
+  fn reduce_subgroup_op_and(v: output_dtype) -> output_dtype {
+    return output_dtype(subgroupAll(bool(v)));
+  }
+
+  fn reduce_subgroup_op_or(v: output_dtype) -> output_dtype {
+    return output_dtype(subgroupAny(bool(v)));
+  }
+
+  fn reduce_subgroup_op_sum(v: output_dtype) -> output_dtype {
+    return subgroupAdd(v);
+  }
+
+  fn reduce_subgroup_op_product(v: output_dtype) -> output_dtype {
+    return subgroupMul(v);
+  }
+
+  fn reduce_subgroup_op_min(v: output_dtype) -> output_dtype {
+    return subgroupMin(v);
+  }
+
+  fn reduce_subgroup_op_max(v: output_dtype) -> output_dtype {
+    return subgroupMax(v);
+  }
+}

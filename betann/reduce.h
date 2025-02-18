@@ -12,7 +12,8 @@ void ReduceAll(Device& device,
                const Buffer& output,
                DataType inputDataType,
                const Buffer& input,
-               uint32_t inputNumElements);
+               uint32_t inputNumElements,
+               bool disableSubgroups = false);
 
 }  // namespace betann
 

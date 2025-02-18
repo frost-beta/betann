@@ -1,6 +1,12 @@
 if ($enable_f16) {
   enable f16;
 }
+if ($enable_subgroups) {
+  enable subgroups;
+}
+if ($enable_subgroups_f16) {
+  enable subgroups_f16;
+}
 
 alias output_dtype = $output_dtype;
 alias input_dtype = $input_dtype;
@@ -12,10 +18,18 @@ const block_size = workgroup_size_x * work_per_thread;
 @group(0) @binding(0) var<storage, read_write> output: array<output_dtype>;
 @group(0) @binding(1) var<storage, read> input: array<input_dtype>;
 
-var<workgroup> workgroup_vals: array<output_dtype, workgroup_size_x>;
+if ($enable_subgroups) {
+  var<workgroup> workgroup_vals: array<output_dtype, workgroup_size_x / $subgroup_min_size>;
+} else {
+  var<workgroup> workgroup_vals: array<output_dtype, workgroup_size_x>;
+}
 
 @compute @workgroup_size(workgroup_size_x, 1, 1)
-fn reduce_all_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
+fn reduce_all_$op(if ($enable_subgroups) {
+                    @builtin(subgroup_size) subgroup_size: u32,
+                    @builtin(subgroup_invocation_id) subgroup_gid: u32,
+                  }
+                  @builtin(global_invocation_id) gid: vec3<u32>) {
   var total = get_initial_value_$op();
 
   // Loop over input.
@@ -36,22 +50,44 @@ fn reduce_all_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
   }
 
-  // Write to shared memory.
-  workgroup_vals[gid.x] = total;
+  if ($enable_subgroups) {
+    // Subgroup reduction.
+    total = reduce_subgroup_op_$op(total);
 
-  // Workgroup accumulations.
-  workgroupBarrier();
-  for (var delta = workgroup_size_x / 2; delta >= 1; delta >>= 1) {
-    if (gid.x < delta) {
-      workgroup_vals[gid.x] = reduce_op_$op(workgroup_vals[gid.x],
-                                            workgroup_vals[gid.x + delta]);
+    let subgroup_count = (workgroup_size_x + subgroup_size - 1) / subgroup_size;
+    if (subgroup_count > 1) {
+      // Write to shared memory.
+      if (subgroup_gid == 0) {
+        workgroup_vals[gid.x / subgroup_size] = total;
+      }
+
+      // Workgroup reduction.
+      workgroupBarrier();
+      total = select(get_initial_value_$op(), workgroup_vals[gid.x], gid.x < subgroup_count);
+      total = reduce_subgroup_op_$op(total);
     }
+  } else {
+    // Write to shared memory.
+    workgroup_vals[gid.x] = total;
+
+    // Workgroup reduction.
     workgroupBarrier();
+    for (var delta = workgroup_size_x / 2; delta >= 1; delta >>= 1) {
+      if (gid.x < delta) {
+        workgroup_vals[gid.x] = reduce_op_$op(workgroup_vals[gid.x],
+                                              workgroup_vals[gid.x + delta]);
+      }
+      workgroupBarrier();
+    }
   }
 
   // Write output.
   if (gid.x == 0) {
-    output[0] = workgroup_vals[0];
+    if ($enable_subgroups) {
+      output[0] = total;
+    } else {
+      output[0] = workgroup_vals[0];
+    }
   }
 }
 
