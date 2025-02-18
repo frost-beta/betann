@@ -144,13 +144,17 @@ void Device::WaitFor(const wgpu::Future& future) {
 void Device::WaitAll() {
   auto futures = std::move(futures_);
   while (!futures.empty()) {
-    std::vector<wgpu::FutureWaitInfo> infos;
-    for (uint64_t futureID : futures)
-      infos.push_back({futureID});
-    instance_.WaitAny(infos.size(), infos.data(), UINT64_MAX);
-    for (const wgpu::FutureWaitInfo& info : infos) {
-      if (info.completed)
-        futures.erase(info.future.id);
+    auto it = futures.begin();
+    for (size_t i = 0; i < DivCeil(futures.size(), 64u); ++i) {
+      std::vector<wgpu::FutureWaitInfo> infos;
+      for (size_t j = 0; j < 64 && it != futures.end(); ++j, ++it) {
+        infos.push_back({*it});
+      }
+      instance_.WaitAny(infos.size(), infos.data(), UINT64_MAX);
+      for (const wgpu::FutureWaitInfo& info : infos) {
+        if (info.completed)
+          futures.erase(info.future.id);
+      }
     }
   }
 }
