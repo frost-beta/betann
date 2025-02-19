@@ -117,10 +117,8 @@ void MatrixVectorMultiply(Device& device,
                         {"row_work_per_thread", rowWorkPerThread},
                         {"col_work_per_thread", colWorkPerThread},
 #ifdef __APPLE__
-                        {"needs_workgroup_reduction", !enableSubgroups},
                         {"subgroup_min_size", 32u},
 #else
-                        {"needs_workgroup_reduction", true},
                         {"subgroup_min_size", 4u},
 #endif
                       }),

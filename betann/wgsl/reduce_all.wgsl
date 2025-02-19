@@ -57,10 +57,12 @@ fn reduce_all_$op(if ($enable_subgroups) {
 
     // Workgroup reduction.
     for (var delta = workgroup_size_x / subgroup_size; delta > 1; delta /= subgroup_size) {
+      // Write first lane's result to shared memory.
       if (subgroup_gid == 0) {
         workgroup_vals[gid.x / subgroup_size] = total;
       }
 
+      // Subgroup reduction.
       workgroupBarrier();
       total = select(initial_value, workgroup_vals[gid.x], gid.x < delta);
       total = reduce_subgroup_op_$op(total);

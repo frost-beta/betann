@@ -31,19 +31,17 @@ if (!$contiguous) {
   @group(0) @binding(8) var<storage, read> batch_shape: array<u32>;
 }
 
-// The workgroup_result collects results from each thread.
-if ($needs_workgroup_reduction) {
-  if ($enable_subgroups) {
-    // When enable_subgroups we only need results from each subgroup, however
-    // as we don't know the subgroup_size we have to assume minimum size.
-    const workgroup_result_cols = workgroup_size_col / $subgroup_min_size;
-  } else {
-    const workgroup_result_cols = workgroup_size_col;
-  }
-  var<workgroup> workgroup_result: array<dtype, workgroup_size_row *
-                                                row_work_per_thread *
-                                                workgroup_result_cols>;
+if ($enable_subgroups) {
+  // When enable_subgroups we only need results from each subgroup, however
+  // as we don't know the subgroup_size we have to assume minimum size.
+  const workgroup_result_cols = workgroup_size_col / $subgroup_min_size;
+} else {
+  const workgroup_result_cols = workgroup_size_col;
 }
+// The workgroup_result collects results from each thread.
+var<workgroup> workgroup_result: array<dtype, workgroup_size_row *
+                                              row_work_per_thread *
+                                              workgroup_result_cols>;
 
 @compute @workgroup_size(workgroup_size_col, workgroup_size_row)
 fn gemv(if ($enable_subgroups) {
@@ -119,37 +117,33 @@ fn gemv(if ($enable_subgroups) {
   }
 
   if ($enable_subgroups) {
-    // Subgroup size can be larger than workgroup size.
-    let subgroup_cols = min(subgroup_size, workgroup_size_col);
-    let subgroup_tid = lid.x / subgroup_cols;
-
     // Subgroup accumulations.
     for (var r = 0u; r < row_work_per_thread; r++) {
-      for (var delta = subgroup_cols / 2; delta >= 1; delta >>= 1) {
-        result[r] += subgroupShuffleDown(result[r], delta);
+      if (subgroup_size <= workgroup_size_col) {
+        result[r] = subgroupAdd(result[r]);
+      } else {
+        for (var delta = workgroup_size_col / 2; delta >= 1; delta >>= 1) {
+          result[r] += subgroupShuffleDown(result[r], delta);
+        }
       }
     }
 
-    if ($needs_workgroup_reduction) {
+    // Workgroup accumulations.
+    for (var delta = workgroup_size_col / subgroup_size; delta > 1; delta /= subgroup_size) {
       // Write first lane's result to shared memory.
-      if (lid.x % subgroup_cols == 0) {
+      if (lid.x % subgroup_size == 0) {
         for (var r = 0u; r < row_work_per_thread; r++) {
-          let idx = (lid.y * row_work_per_thread + r) * workgroup_result_cols + subgroup_tid;
-          workgroup_result[idx] = result[r];
+          let idx = (lid.y * row_work_per_thread + r) * workgroup_result_cols;
+          workgroup_result[idx + lid.x / subgroup_size] = result[r];
         }
       }
 
-      // Workgroup accumulations.
+      // Subgroup accumulations.
       workgroupBarrier();
       for (var r = 0u; r < row_work_per_thread; r++) {
-        let idx = (lid.y * row_work_per_thread + r) * workgroup_result_cols + subgroup_tid;
-        let num_subgroups = workgroup_size_col / subgroup_cols;
-        for (var delta = num_subgroups / 2; delta >= 1; delta >>= 1) {
-          if (lid.x % subgroup_cols == 0 && subgroup_tid < delta) {
-            workgroup_result[idx] += workgroup_result[idx + delta];
-          }
-          workgroupBarrier();
-        }
+        let idx = (lid.y * row_work_per_thread + r) * workgroup_result_cols;
+        result[r] = select(0, workgroup_result[idx + lid.x], lid.x < delta);
+        result[r] = subgroupAdd(result[r]);
       }
     }
   } else {
@@ -178,11 +172,11 @@ fn gemv(if ($enable_subgroups) {
   }
   for (var r = 0u; r < row_work_per_thread; r++) {
     if (out_row + r < mat_rows) {
-      if ($needs_workgroup_reduction) {
+      if ($enable_subgroups) {
+        out[out_offset + r] = result[r];
+      } else {
         let idx = (lid.y * row_work_per_thread + r) * workgroup_result_cols;
         out[out_offset + r] = workgroup_result[idx];
-      } else {
-        out[out_offset + r] = result[r];
       }
     }
   }
