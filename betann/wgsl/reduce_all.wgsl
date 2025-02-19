@@ -30,7 +30,8 @@ fn reduce_all_$op(if ($enable_subgroups) {
                     @builtin(subgroup_invocation_id) subgroup_gid: u32,
                   }
                   @builtin(global_invocation_id) gid: vec3<u32>) {
-  var total = get_initial_value_$op();
+  let initial_value = get_initial_value_$op();
+  var total = initial_value;
 
   // Loop over input.
   let input_size = arrayLength(&input);
@@ -54,16 +55,14 @@ fn reduce_all_$op(if ($enable_subgroups) {
     // Subgroup reduction.
     total = reduce_subgroup_op_$op(total);
 
-    let subgroup_count = (workgroup_size_x + subgroup_size - 1) / subgroup_size;
-    if (subgroup_count > 1) {
-      // Write to shared memory.
+    // Workgroup reduction.
+    for (var delta = workgroup_size_x / subgroup_size; delta > 1; delta /= subgroup_size) {
       if (subgroup_gid == 0) {
         workgroup_vals[gid.x / subgroup_size] = total;
       }
 
-      // Workgroup reduction.
       workgroupBarrier();
-      total = select(get_initial_value_$op(), workgroup_vals[gid.x], gid.x < subgroup_count);
+      total = select(initial_value, workgroup_vals[gid.x], gid.x < delta);
       total = reduce_subgroup_op_$op(total);
     }
   } else {
