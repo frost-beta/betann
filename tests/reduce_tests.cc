@@ -34,19 +34,19 @@ class ReduceTests : public BetaNNTests {
 };
 
 TEST_F(ReduceTests, ReduceAll) {
-  const uint32_t sizes[] = {1, 31, 32, 33, 127, 128, 129, 200};
+  const uint32_t sizes[] = {1, 31, 32, 33, 127, 128, 129, 200, 300, 4100};
   for (bool disableSubgroups : GetParameters()) {
     for (uint32_t size : sizes) {
       SCOPED_TRACE(fmt::format("Subgroups: {}, size: {}",
                                !disableSubgroups, size));
       auto floats = RandomNumbers<float>(size);
-      EXPECT_EQ(RunReduceAll<float>("sum", floats, disableSubgroups),
-                std::accumulate(floats.begin(), floats.end(), 0));
       EXPECT_EQ(RunReduceAll<float>("min", floats, disableSubgroups),
                 *std::min_element(floats.begin(), floats.end()));
       EXPECT_EQ(RunReduceAll<float>("max", floats, disableSubgroups),
                 *std::max_element(floats.begin(), floats.end()));
       auto ints = RandomNumbers<int32_t>(size, 10);
+      EXPECT_EQ(RunReduceAll<int32_t>("sum", ints, disableSubgroups),
+                std::accumulate(ints.begin(), ints.end(), 0));
       EXPECT_EQ(RunReduceAll<uint32_t>("product", ints, disableSubgroups),
                 std::accumulate(ints.begin(), ints.end(), 1,
                                 std::multiplies<int32_t>()));
