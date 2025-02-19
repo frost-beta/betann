@@ -7,14 +7,14 @@
 class ReduceTests : public BetaNNTests {
  public:
   template<typename T, typename U>
-  T RunReduceAll(const char* op,
+  T RunReduceAll(betann::ReduceType type,
                  const std::vector<U>& input,
                  bool disableSubgroups = false) {
     betann::Buffer output = device_.CreateBuffer(
         sizeof(T),
         betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
     betann::ReduceAll(device_,
-                      op,
+                      type,
                       betann::GetDataType<T>(),
                       output,
                       betann::GetDataType<U>(),
@@ -40,22 +40,26 @@ TEST_F(ReduceTests, ReduceAll) {
       SCOPED_TRACE(fmt::format("Subgroups: {}, size: {}",
                                !disableSubgroups, size));
       auto floats = RandomNumbers<float>(size);
-      EXPECT_EQ(RunReduceAll<float>("min", floats, disableSubgroups),
+      EXPECT_EQ(RunReduceAll<float>(betann::ReduceType::Min, floats,
+                                    disableSubgroups),
                 *std::min_element(floats.begin(), floats.end()));
-      EXPECT_EQ(RunReduceAll<float>("max", floats, disableSubgroups),
+      EXPECT_EQ(RunReduceAll<float>(betann::ReduceType::Max, floats,
+                                    disableSubgroups),
                 *std::max_element(floats.begin(), floats.end()));
       auto ints = RandomNumbers<int32_t>(size, 10);
-      EXPECT_EQ(RunReduceAll<int32_t>("sum", ints, disableSubgroups),
+      EXPECT_EQ(RunReduceAll<int32_t>(betann::ReduceType::Sum, ints,
+                                      disableSubgroups),
                 std::accumulate(ints.begin(), ints.end(), 0));
-      EXPECT_EQ(RunReduceAll<uint32_t>("product", ints, disableSubgroups),
+      EXPECT_EQ(RunReduceAll<uint32_t>(betann::ReduceType::Prod, ints,
+                                       disableSubgroups),
                 std::accumulate(ints.begin(), ints.end(), 1,
                                 std::multiplies<int32_t>()));
     }
-    EXPECT_EQ(RunReduceAll<uint32_t>("and",
+    EXPECT_EQ(RunReduceAll<uint32_t>(betann::ReduceType::And,
                                      std::vector<uint32_t>{true, false},
                                      disableSubgroups),
               false);
-    EXPECT_EQ(RunReduceAll<uint32_t>("or",
+    EXPECT_EQ(RunReduceAll<uint32_t>(betann::ReduceType::Or,
                                      std::vector<uint32_t>{true, false},
                                      disableSubgroups),
               true);

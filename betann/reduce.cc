@@ -9,8 +9,29 @@
 
 namespace betann {
 
+namespace {
+
+const char* ReduceTypeToString(ReduceType type) {
+  switch (type) {
+    case ReduceType::And:
+      return "and";
+    case ReduceType::Or:
+      return "or";
+    case ReduceType::Sum:
+      return "sum";
+    case ReduceType::Prod:
+      return "prod";
+    case ReduceType::Min:
+      return "min";
+    case ReduceType::Max:
+      return "max";
+  }
+}
+
+}  // namespace
+
 void ReduceAll(Device& device,
-               const char* op,
+               ReduceType type,
                DataType outputDataType,
                const Buffer& output,
                DataType inputDataType,
@@ -29,6 +50,7 @@ void ReduceAll(Device& device,
   }
 
   // Kernel creation helper.
+  const char* op = ReduceTypeToString(type);
   auto runKernel = [&](DataType outputDataType,
                        const Buffer& output,
                        DataType inputDataType,
