@@ -18,11 +18,74 @@ class ReduceTests : public BetaNNTests {
                       betann::GetDataType<T>(),
                       output,
                       betann::GetDataType<U>(),
-                      device_.CreateBufferTransformTo<U>(input),
+                      device_.CreateBufferFromVector(input),
                       input.size(),
                       disableSubgroups);
     device_.Flush();
     return ReadFromBuffer<T>(output, 1)[0];
+  }
+
+  template<typename T, typename U>
+  std::vector<T> RunReduceRow(betann::ReduceType type,
+                              const std::vector<U>& input,
+                              const std::vector<uint32_t>& shape,
+                              const std::vector<uint32_t>& strides,
+                              const std::vector<uint32_t>& axes,
+                              bool disableSubgroups = false) {
+    uint32_t outputNumElements =
+        betann::NumElements(betann::RemoveIndices(shape, axes));
+    betann::Buffer output = device_.CreateBuffer(
+        outputNumElements * sizeof(T),
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
+    betann::ReduceRow(device_,
+                      type,
+                      betann::GetDataType<T>(),
+                      output,
+                      outputNumElements,
+                      betann::GetDataType<U>(),
+                      device_.CreateBufferFromVector(input),
+                      shape,
+                      strides,
+                      axes,
+                      betann::KeepIndices(shape, axes),
+                      betann::KeepIndices(strides, axes),
+                      disableSubgroups);
+    device_.Flush();
+    return ReadFromBuffer<T>(output, outputNumElements);
+  }
+
+  std::vector<uint32_t> Strides(const std::vector<uint32_t>& shape) {
+    std::vector<uint32_t> strides(shape.size());
+    uint32_t size = 1;
+    for (int32_t i = shape.size() - 1; i >= 0; --i) {
+      strides[i] = size;
+      size *= shape[i];
+    }
+    return strides;
+  }
+
+  template<typename T>
+  std::vector<T> Sum(const std::vector<T>& input,
+                     const std::vector<uint32_t>& shape,
+                     const std::vector<uint32_t>& strides,
+                     const std::vector<uint32_t>& axes) {
+    std::vector<T> output(
+        betann::NumElements(betann::RemoveIndices(shape, axes)), 0);
+    for (size_t i = 0; i < input.size(); ++i) {
+      uint32_t outIndex = 0;
+      uint32_t inputIndex = i;
+      for (int32_t axis = shape.size() - 1, multiplier = 1; axis >= 0; --axis) {
+        if (std::find(axes.begin(), axes.end(), axis) == axes.end()) {
+          if (strides[axis] != 0) {
+            outIndex += (inputIndex / strides[axis]) * multiplier;
+            inputIndex %= strides[axis];
+          }
+          multiplier *= shape[axis];
+        }
+      }
+      output[outIndex] += input[i];
+    }
+    return output;
   }
 
   std::vector<bool> GetParameters() {
@@ -63,5 +126,32 @@ TEST_F(ReduceTests, ReduceAll) {
                                      std::vector<uint32_t>{true, false},
                                      disableSubgroups),
               true);
+  }
+}
+
+TEST_F(ReduceTests, ReduceRow) {
+  const bool disableSubgroups = true;
+  const std::tuple<std::vector<uint32_t>, std::vector<uint32_t>> shapes[] = {
+    {{31, 127}, {1}},
+    {{31, 127}, {0, 1}},
+    {{32, 128}, {1}},
+    {{32, 128}, {0, 1}},
+    {{33, 129}, {1}},
+    {{33, 129}, {0, 1}},
+    {{31, 127, 300}, {2}},
+    {{31, 127, 300}, {1, 2}},
+    {{31, 127, 300}, {0, 1, 2}},
+    {{33, 33, 33, 1}, {3}},
+    {{33, 33, 33, 1}, {2, 3}},
+  };
+  for (const auto& [shape, axes] : shapes) {
+    SCOPED_TRACE(fmt::format("Subgroups: {}, shape: {}x{}, axes: {}",
+                             !disableSubgroups, shape[0], shape[1], axes[0]));
+    auto strides = Strides(shape);
+    auto ints = RandomNumbers<int32_t>(betann::NumElements(shape), 10);
+    EXPECT_EQ(RunReduceRow<int32_t>(betann::ReduceType::Sum,
+                                    ints, shape, strides, axes,
+                                    disableSubgroups),
+              Sum(ints, shape, strides, axes));
   }
 }

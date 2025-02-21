@@ -4,7 +4,6 @@
 
 #include "betann/kernels.h"
 #include "betann/kernels_helper.h"
-#include "betann/preprocessor.h"
 #include "wgsl_sources.h"
 
 namespace betann {

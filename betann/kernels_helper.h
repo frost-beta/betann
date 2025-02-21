@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "betann/device.h"
+#include "betann/preprocessor.h"
 
 namespace betann {
 
@@ -31,6 +32,17 @@ void RunKernel(Device& device,
                    device.CreateBindGroup(kernel, std::move(buffers)),
                    workgroupsCount);
 }
+
+template<typename... Args>
+inline bool EnableF16(Args... dataType) {
+  return ((dataType == DataType::F16) && ...);
+}
+
+bool EnableSubgroups(Device& device, bool enableF16, bool disableSubgroups);
+
+VariablesMap GetCapacityVariables(Device& device,
+                                  bool enableF16,
+                                  bool disableSubgroups);
 
 }  // namespace betann
 

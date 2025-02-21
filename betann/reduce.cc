@@ -2,9 +2,7 @@
 
 #include <fmt/format.h>
 
-#include "betann/kernels.h"
 #include "betann/kernels_helper.h"
-#include "betann/preprocessor.h"
 #include "wgsl_sources.h"
 
 namespace betann {
@@ -28,6 +26,37 @@ const char* ReduceTypeToString(ReduceType type) {
   }
 }
 
+std::string GetReduceShaderCode(const char* source,
+                                const char* op,
+                                const VariablesMap& capacities,
+                                DataType outputDataType,
+                                DataType inputDataType,
+                                uint32_t workgroupSize) {
+  return Append(
+      ParseTemplate(
+          source,
+          {
+            {"op", op},
+            {"output_dtype", WgslType(outputDataType)},
+            {"input_dtype", WgslType(inputDataType)},
+            {"workgroup_size", workgroupSize},
+          },
+          capacities),
+      ParseTemplate(
+          wgsl_source_constants,
+          {
+            {"dtype", WgslType(outputDataType)},
+          },
+          capacities),
+      ParseTemplate(
+          wgsl_source_reduce_ops,
+          {
+            {"op", op},
+            {"output_dtype", WgslType(outputDataType)},
+          },
+          capacities));
+}
+
 }  // namespace
 
 void ReduceAll(Device& device,
@@ -38,19 +67,7 @@ void ReduceAll(Device& device,
                const Buffer& input,
                uint32_t inputNumElements,
                bool disableSubgroups) {
-  const uint32_t workPerThread = 4;
-
-  // Figure out whether to use subgroups kernel.
-  bool enableSubgroups = !disableSubgroups && device.SupportsSubgroups();
-  bool enableSubgroupsF16 = false;
-  if (enableSubgroups &&
-      (outputDataType == DataType::F16 || inputDataType == DataType::F16)) {
-    enableSubgroups = device.SupportsF16() && device.SupportsSubgroupsF16();
-    enableSubgroupsF16 = enableSubgroups;
-  }
-
   // Kernel creation helper.
-  const char* op = ReduceTypeToString(type);
   auto runKernel = [&](DataType outputDataType,
                        const Buffer& output,
                        DataType inputDataType,
@@ -58,51 +75,31 @@ void ReduceAll(Device& device,
                        uint32_t workgroupSize,
                        uint32_t rowSize,
                        uint32_t numRows) {
+    const char* op = ReduceTypeToString(type);
+    bool enableF16 = EnableF16(outputDataType, inputDataType);
+    auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
     RunKernel(device,
               fmt::format("reduce_all_{}", op),
               fmt::format("reduce_all_{}_{}_{}_{}_{}",
                           op,
-                          enableSubgroups,
+                          std::get<bool>(capacities["enable_subgroups"]),
                           workgroupSize,
                           WgslType(outputDataType),
                           WgslType(inputDataType)),
               [&]() {
-                return Append(
-                    ParseTemplate(
-                        wgsl_source_reduce_all,
-                        {
-                          {"enable_f16", device.SupportsF16()},
-                          {"enable_subgroups", enableSubgroups},
-                          {"enable_subgroups_f16", enableSubgroupsF16},
-                          {"op", op},
-                          {"output_dtype", WgslType(outputDataType)},
-                          {"input_dtype", WgslType(inputDataType)},
-                          {"workgroup_size", workgroupSize},
-#ifdef __APPLE__
-                          {"subgroup_min_size", 32u},
-#else
-                          {"subgroup_min_size", 4u},
-#endif
-                        }),
-                    ParseTemplate(
-                        wgsl_source_constants,
-                        {
-                          {"enable_f16", device.SupportsF16()},
-                          {"dtype", WgslType(outputDataType)},
-                        }),
-                    ParseTemplate(
-                        wgsl_source_reduce_ops,
-                        {
-                          {"enable_subgroups", enableSubgroups},
-                          {"op", op},
-                          {"output_dtype", WgslType(outputDataType)},
-                        }));
+                return GetReduceShaderCode(wgsl_source_reduce_all,
+                                           op,
+                                           capacities,
+                                           outputDataType,
+                                           inputDataType,
+                                           workgroupSize);
               },
               {output, input, device.CreateBufferFromScalar(rowSize)},
               {1, numRows, 1});
   };
 
   // Kernel dispatch.
+  const uint32_t workPerThread = 4;
   if (inputNumElements <= workPerThread * 1024) {
     // Small input use a single workgroup.
     uint32_t workgroupSize = 64;  // TODO(zcbenz): make it dynamic
@@ -129,6 +126,71 @@ void ReduceAll(Device& device,
     runKernel(outputDataType, output, outputDataType, intermediate,
               workgroupSize2ndPass, numRows, 1);
   }
+}
+
+void ReduceRow(Device& device,
+               ReduceType type,
+               DataType outputDataType,
+               const Buffer& output,
+               uint32_t outputNumElements,
+               DataType inputDataType,
+               const Buffer& input,
+               const std::vector<uint32_t>& inputShape,
+               const std::vector<uint32_t>& inputStrides,
+               const std::vector<uint32_t>& reductionAxes,
+               std::vector<uint32_t> reductionShape,
+               std::vector<uint32_t> reductionStrides,
+               bool disableSubgroups) {
+  if (reductionStrides.back() != 1)
+    throw std::runtime_error("The reducted row must be contiguous.");
+  // The info used for reading rows.
+  uint32_t rowSize = reductionShape.back();
+  reductionShape.pop_back();
+  reductionStrides.pop_back();
+  uint32_t nonRowReductions = NumElements(reductionShape);
+  // The shape/strides used for locating where to read rows.
+  auto nonReductionShape = RemoveIndices(inputShape, reductionAxes);
+  auto nonReductionStrides = RemoveIndices(inputStrides, reductionAxes);
+  std::tie(nonReductionShape, nonReductionStrides) =
+      CollapseContiguousDims(nonReductionShape, nonReductionStrides);
+
+  // Kernel dispatch.
+  const uint32_t workPerThread = 4;
+  const uint32_t workgroupSize = 128;  // TODO(zcbenz): make it dynamic
+  const char* op = ReduceTypeToString(type);
+  bool enableF16 = EnableF16(outputDataType, inputDataType);
+  auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
+  RunKernel(device,
+            fmt::format("reduce_row_small_{}", op),
+            fmt::format("reduce_row_{}_{}_{}_{}_{}",
+                        op,
+                        std::get<bool>(capacities["enable_subgroups"]),
+                        workgroupSize,
+                        WgslType(outputDataType),
+                        WgslType(inputDataType)),
+            [&]() {
+              return Append(GetReduceShaderCode(wgsl_source_reduce_row,
+                                                op,
+                                                capacities,
+                                                outputDataType,
+                                                inputDataType,
+                                                workgroupSize),
+                            wgsl_source_utils);
+            },
+            {
+              output,
+              device.CreateBufferFromScalar(outputNumElements),
+              input,
+              device.CreateBufferFromScalar(rowSize),
+              device.CreateBufferFromScalar(nonRowReductions),
+              device.CreateBufferFromVector(nonReductionShape),
+              device.CreateBufferFromVector(nonReductionStrides),
+              device.CreateBufferFromVector(reductionShape),
+              device.CreateBufferFromVector(reductionStrides),
+            },
+            {
+              DivCeil(outputNumElements, workgroupSize),
+            });
 }
 
 }  // namespace betann

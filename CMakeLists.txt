@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(betann STATIC)
 target_sources(betann PRIVATE betann/device.cc
                               betann/kernels.cc
+                              betann/kernels_helper.cc
                               betann/math.cc
                               betann/matmul.cc
                               betann/preprocessor.cc
@@ -49,6 +50,7 @@ set(BETANN_WGSL_SOURCES betann/wgsl/arange.wgsl
                         betann/wgsl/random.wgsl
                         betann/wgsl/reduce_all.wgsl
                         betann/wgsl/reduce_ops.wgsl
+                        betann/wgsl/reduce_row.wgsl
                         betann/wgsl/sort_block.wgsl
                         betann/wgsl/unary_contiguous.wgsl
                         betann/wgsl/unary_general.wgsl

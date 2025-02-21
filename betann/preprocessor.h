@@ -17,6 +17,14 @@ using VariablesMap = std::map<std::string_view,
 std::string ParseTemplate(std::string_view templ,
                           const VariablesMap& variables);
 
+template<typename... Args>
+inline std::string ParseTemplate(std::string_view templ,
+                                 VariablesMap variables,
+                                 Args... args) {
+  (variables.merge(args), ...);
+  return ParseTemplate(templ, variables);
+}
+
 }  // namespace betann
 
 #endif  // BETANN_PREPROCESSOR_H_

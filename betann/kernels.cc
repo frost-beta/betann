@@ -2,7 +2,6 @@
 
 #include <fmt/format.h>
 
-#include "betann/preprocessor.h"
 #include "betann/kernels_helper.h"
 #include "wgsl_sources.h"
 
