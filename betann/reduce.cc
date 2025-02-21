@@ -155,19 +155,28 @@ void ReduceRow(Device& device,
       CollapseContiguousDims(nonReductionShape, nonReductionStrides);
 
   // Kernel dispatch.
-  const uint32_t workgroupSize = 128;  // TODO(zcbenz): make it dynamic
+  uint32_t workgroupSize = 128;  // TODO(zcbenz): make it dynamic
+  uint32_t coordCacheSize;
+  if (reductionShape.size() <= 1)
+    coordCacheSize = 1;
+  else if (reductionShape.size() == 2)
+    coordCacheSize = 2;
+  else
+    coordCacheSize = 5;
   const char* op = ReduceTypeToString(type);
   bool enableF16 = EnableF16(device, outputDataType, inputDataType);
   auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
   RunKernel(device,
             fmt::format("reduce_row_small_{}", op),
-            fmt::format("reduce_row_{}_{}_{}_{}_{}",
+            fmt::format("reduce_row_{}_{}_{}_{}_{}_{}",
                         op,
                         std::get<bool>(capacities["enable_subgroups"]),
                         workgroupSize,
+                        coordCacheSize,
                         WgslType(outputDataType),
                         WgslType(inputDataType)),
             [&]() {
+              capacities["coord_cache_size"] = coordCacheSize;
               return Append(GetReduceShaderCode(wgsl_source_reduce_row,
                                                 op,
                                                 capacities,
@@ -183,13 +192,13 @@ void ReduceRow(Device& device,
               device.CreateBufferFromScalar(rowSize),
               device.CreateBufferFromScalar(nonRowReductions),
               nonReductionShape.empty()
-                  ? device.CreateBufferFromScalar(1u)
+                  ? device.CreateBufferFromScalar(0u)
                   : device.CreateBufferFromVector(nonReductionShape),
               nonReductionStrides.empty()
                   ? device.CreateBufferFromScalar(0u)
                   : device.CreateBufferFromVector(nonReductionStrides),
               reductionShape.empty()
-                  ? device.CreateBufferFromScalar(1u)
+                  ? device.CreateBufferFromScalar(0u)
                   : device.CreateBufferFromVector(reductionShape),
               reductionStrides.empty()
                   ? device.CreateBufferFromScalar(0u)

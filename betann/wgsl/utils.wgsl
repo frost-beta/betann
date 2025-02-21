@@ -23,7 +23,13 @@ fn coords_to_index_d3(coords: vec3<u32>,
 fn coord_to_index(coord: u32,
                   shape: ptr<storage, array<u32>>,
                   strides: ptr<storage, array<u32>>) -> u32 {
-  let ndim = i32(arrayLength(shape));
+  return coord_to_index_ndim(coord, shape, strides,  i32(arrayLength(shape)));
+}
+
+fn coord_to_index_ndim(coord: u32,
+                       shape: ptr<storage, array<u32>>,
+                       strides: ptr<storage, array<u32>>,
+                       ndim: i32) -> u32 {
   var idx: u32 = 0;
   var elem = coord;
   for (var d: i32 = ndim - 1; d >= 0 && elem > 0; d--) {
