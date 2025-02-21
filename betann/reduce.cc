@@ -76,7 +76,7 @@ void ReduceAll(Device& device,
                        uint32_t rowSize,
                        uint32_t numRows) {
     const char* op = ReduceTypeToString(type);
-    bool enableF16 = EnableF16(outputDataType, inputDataType);
+    bool enableF16 = EnableF16(device, outputDataType, inputDataType);
     auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
     RunKernel(device,
               fmt::format("reduce_all_{}", op),
@@ -158,7 +158,7 @@ void ReduceRow(Device& device,
   const uint32_t workPerThread = 4;
   const uint32_t workgroupSize = 128;  // TODO(zcbenz): make it dynamic
   const char* op = ReduceTypeToString(type);
-  bool enableF16 = EnableF16(outputDataType, inputDataType);
+  bool enableF16 = EnableF16(device, outputDataType, inputDataType);
   auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
   RunKernel(device,
             fmt::format("reduce_row_small_{}", op),

@@ -34,8 +34,12 @@ void RunKernel(Device& device,
 }
 
 template<typename... Args>
-inline bool EnableF16(Args... dataType) {
-  return ((dataType == DataType::F16) && ...);
+inline bool EnableF16(Device& device, Args... dataType) {
+  if (!((dataType == DataType::F16) && ...))
+    return false;
+  if (!device.SupportsF16())
+    throw std::runtime_error("Device does not support f16 data type.");
+  return true;
 }
 
 bool EnableSubgroups(Device& device, bool enableF16, bool disableSubgroups);

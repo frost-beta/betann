@@ -50,20 +50,12 @@ void MatrixVectorMultiply(Device& device,
                           const Buffer& vec,
                           const std::vector<uint32_t>& batchStridesVec,
                           bool disableSubgroups) {
-  // Figure out whether to use subgroups kernel.
-  bool enableSubgroups = !disableSubgroups && device.SupportsSubgroups();
-  bool enableSubgroupsF16 = false;
 #ifndef __APPLE__
-  if (matTranspose) {
-    // There is no way to control subgroup size and it is usually too small for
-    // gemvt kernel.
-    enableSubgroups = false;
-  }
+  // There is no way to control subgroup size and it is usually too small for
+  // gemvt kernel.
+  if (matTranspose)
+    disableSubgroups = true;
 #endif
-  if (enableSubgroups && dataType == DataType::F16) {
-    enableSubgroups = device.SupportsF16() && device.SupportsSubgroupsF16();
-    enableSubgroupsF16 = enableSubgroups;
-  }
 
   // Determine the parameters according to data size.
   uint32_t groupCount, groupRows, groupCols, rowWorkPerThread, colWorkPerThread;
@@ -86,13 +78,15 @@ void MatrixVectorMultiply(Device& device,
     colWorkPerThread = 4;
   }
 
-  const bool contiguous = batchShape.size() < 2;
+  bool contiguous = batchShape.size() < 2;
+  bool enableF16 = EnableF16(device, dataType);
+  auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
   RunKernel(device,
             matTranspose ? "gemvt" : "gemv",
             fmt::format("gemv_{}_{}_{}_{}_{}_{}_{}_{}_{}",
                         matTranspose,
                         contiguous,
-                        enableSubgroups,
+                        std::get<bool>(capacities["enable_subgroups"]),
                         WgslType(dataType),
                         groupCount,
                         groupRows,
@@ -107,20 +101,13 @@ void MatrixVectorMultiply(Device& device,
                         {"contiguous", contiguous},
                         {"dtype", WgslType(dataType)},
                         {"dtype_is_floating", IsFloating(dataType)},
-                        {"enable_f16", device.SupportsF16()},
-                        {"enable_subgroups", enableSubgroups},
-                        {"enable_subgroups_f16", enableSubgroupsF16},
                         {"group_count", groupCount},
                         {"group_rows", groupRows},
                         {"group_cols", groupCols},
                         {"row_work_per_thread", rowWorkPerThread},
                         {"col_work_per_thread", colWorkPerThread},
-#ifdef __APPLE__
-                        {"subgroup_min_size", 32u},
-#else
-                        {"subgroup_min_size", 4u},
-#endif
-                      }),
+                      },
+                      capacities),
                   wgsl_source_utils);
             },
             {

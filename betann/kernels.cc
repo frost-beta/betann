@@ -67,11 +67,12 @@ void ArrayRange(Device& device,
             "arange",
             fmt::format("arange_{}", WgslType(dataType)),
             [&]() {
-              return ParseTemplate(wgsl_source_arange,
-                                   {
-                                     {"enable_f16", device.SupportsF16()},
-                                     {"dtype", WgslType(dataType)},
-                                   });
+              return ParseTemplate(
+                  wgsl_source_arange,
+                  {
+                    {"enable_f16", EnableF16(device, dataType)},
+                    {"dtype", WgslType(dataType)},
+                  });
             },
             {
               device.CreateBufferFromScalar(start, dataType),
@@ -120,7 +121,9 @@ void BinaryOpContiguous(Device& device,
                   ParseTemplate(
                       wgsl_source_binary_contiguous,
                       {
-                        {"enable_f16", device.SupportsF16()},
+                        {"enable_f16", EnableF16(device,
+                                                 outputDataType,
+                                                 inputDataType)},
                         {"output_dtype", WgslType(outputDataType)},
                         {"input_dtype", WgslType(inputDataType)},
                         {"op", name},
@@ -167,7 +170,9 @@ void BinaryOpGeneral(Device& device,
                   ParseTemplate(
                       wgsl_source_binary_general,
                       {
-                        {"enable_f16", device.SupportsF16()},
+                        {"enable_f16", EnableF16(device,
+                                                 outputDataType,
+                                                 inputDataType)},
                         {"output_dtype", WgslType(outputDataType)},
                         {"input_dtype", WgslType(inputDataType)},
                         {"op", name},
@@ -220,12 +225,13 @@ void CopyContiguous(Device& device,
                         WgslType(dstDataType),
                         WgslType(srcDataType)),
             [&]() {
-              return ParseTemplate(wgsl_source_copy_contiguous,
-                                   {
-                                     {"enable_f16", device.SupportsF16()},
-                                     {"dst_dtype", WgslType(dstDataType)},
-                                     {"src_dtype", WgslType(srcDataType)},
-                                   });
+              return ParseTemplate(
+                  wgsl_source_copy_contiguous,
+                  {
+                    {"enable_f16", EnableF16(device, dstDataType, srcDataType)},
+                    {"dst_dtype", WgslType(dstDataType)},
+                    {"src_dtype", WgslType(srcDataType)},
+                  });
             },
             {dst, src},
             GetWorkgroupsCountContiguous(dstNumElements,
@@ -255,13 +261,16 @@ void CopyGeneral(Device& device,
                         WgslType(srcDataType)),
             [&]() {
               return Append(
-                         ParseTemplate(wgsl_source_copy_general,
-                                       {
-                                         {"enable_f16", device.SupportsF16()},
-                                         {"dst_dtype", WgslType(dstDataType)},
-                                         {"src_dtype", WgslType(srcDataType)},
-                                       }),
-                         wgsl_source_utils);
+                  ParseTemplate(
+                      wgsl_source_copy_general,
+                      {
+                        {"enable_f16", EnableF16(device,
+                                                 dstDataType,
+                                                 srcDataType)},
+                        {"dst_dtype", WgslType(dstDataType)},
+                        {"src_dtype", WgslType(srcDataType)},
+                      }),
+                  wgsl_source_utils);
             },
             {
               dst,
@@ -298,13 +307,16 @@ void CopyGeneralBoth(Device& device,
                         WgslType(srcDataType)),
             [&]() {
               return Append(
-                         ParseTemplate(wgsl_source_copy_general_both,
-                                       {
-                                         {"enable_f16", device.SupportsF16()},
-                                         {"dst_dtype", WgslType(dstDataType)},
-                                         {"src_dtype", WgslType(srcDataType)},
-                                       }),
-                         wgsl_source_utils);
+                 ParseTemplate(
+                     wgsl_source_copy_general_both,
+                     {
+                       {"enable_f16", EnableF16(device,
+                                                dstDataType,
+                                                srcDataType)},
+                       {"dst_dtype", WgslType(dstDataType)},
+                       {"src_dtype", WgslType(srcDataType)},
+                     }),
+                 wgsl_source_utils);
             },
             {
               dst,
@@ -444,10 +456,11 @@ void SortBlock(Device& device,
                         argsort,
                         contiguous),
             [&]() {
+              bool enableF16 = EnableF16(device, inputDataType);
               return Append(
                   ParseTemplate(wgsl_source_sort_block,
                                 {
-                                  {"enable_f16", device.SupportsF16()},
+                                  {"enable_f16", enableF16},
                                   {"dtype", WgslType(inputDataType)},
                                   {"argsort", argsort},
                                   {"contiguous", contiguous},
@@ -455,7 +468,7 @@ void SortBlock(Device& device,
                   wgsl_source_utils,
                   ParseTemplate(wgsl_source_constants,
                                 {
-                                  {"enable_f16", device.SupportsF16()},
+                                  {"enable_f16", enableF16},
                                   {"dtype", WgslType(inputDataType)},
                                 }));
             },
@@ -487,7 +500,9 @@ void UnaryOpContiguous(Device& device,
                   ParseTemplate(
                       wgsl_source_unary_contiguous,
                       {
-                        {"enable_f16", device.SupportsF16()},
+                        {"enable_f16", EnableF16(device,
+                                                 outputDataType,
+                                                 inputDataType)},
                         {"output_dtype", WgslType(outputDataType)},
                         {"input_dtype", WgslType(inputDataType)},
                         {"op", name},
@@ -530,7 +545,9 @@ void UnaryOpGeneral(Device& device,
                   ParseTemplate(
                       wgsl_source_unary_general,
                       {
-                        {"enable_f16", device.SupportsF16()},
+                        {"enable_f16", EnableF16(device,
+                                                 outputDataType,
+                                                 inputDataType)},
                         {"output_dtype", WgslType(outputDataType)},
                         {"input_dtype", WgslType(inputDataType)},
                         {"op", name},
