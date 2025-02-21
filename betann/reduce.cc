@@ -155,7 +155,6 @@ void ReduceRow(Device& device,
       CollapseContiguousDims(nonReductionShape, nonReductionStrides);
 
   // Kernel dispatch.
-  const uint32_t workPerThread = 4;
   const uint32_t workgroupSize = 128;  // TODO(zcbenz): make it dynamic
   const char* op = ReduceTypeToString(type);
   bool enableF16 = EnableF16(device, outputDataType, inputDataType);
@@ -183,10 +182,18 @@ void ReduceRow(Device& device,
               input,
               device.CreateBufferFromScalar(rowSize),
               device.CreateBufferFromScalar(nonRowReductions),
-              device.CreateBufferFromVector(nonReductionShape),
-              device.CreateBufferFromVector(nonReductionStrides),
-              device.CreateBufferFromVector(reductionShape),
-              device.CreateBufferFromVector(reductionStrides),
+              nonReductionShape.empty()
+                  ? device.CreateBufferFromScalar(1u)
+                  : device.CreateBufferFromVector(nonReductionShape),
+              nonReductionStrides.empty()
+                  ? device.CreateBufferFromScalar(0u)
+                  : device.CreateBufferFromVector(nonReductionStrides),
+              reductionShape.empty()
+                  ? device.CreateBufferFromScalar(1u)
+                  : device.CreateBufferFromVector(reductionShape),
+              reductionStrides.empty()
+                  ? device.CreateBufferFromScalar(0u)
+                  : device.CreateBufferFromVector(reductionStrides),
             },
             {
               DivCeil(outputNumElements, workgroupSize),

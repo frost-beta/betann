@@ -91,6 +91,17 @@ class BetaNNTests : public testing::Test {
     return a;
   }
 
+  template<typename T>
+  std::string VecToString(const std::vector<T>& vec) {
+    std::string result;
+    for (T e : vec) {
+      if (!result.empty())
+        result += "x";
+      result += std::to_string(e);
+    }
+    return result;
+  }
+
   betann::Device device_;
 
  private:

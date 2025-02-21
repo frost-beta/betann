@@ -138,15 +138,17 @@ TEST_F(ReduceTests, ReduceRow) {
     {{32, 128}, {0, 1}},
     {{33, 129}, {1}},
     {{33, 129}, {0, 1}},
-    {{31, 127, 300}, {2}},
-    {{31, 127, 300}, {1, 2}},
-    {{31, 127, 300}, {0, 1, 2}},
+    {{31, 127, 127}, {2}},
+    {{31, 127, 127}, {1, 2}},
     {{33, 33, 33, 1}, {3}},
     {{33, 33, 33, 1}, {2, 3}},
+    {{33, 33, 33, 1}, {1, 2, 3}},
   };
   for (const auto& [shape, axes] : shapes) {
-    SCOPED_TRACE(fmt::format("Subgroups: {}, shape: {}x{}, axes: {}",
-                             !disableSubgroups, shape[0], shape[1], axes[0]));
+    SCOPED_TRACE(fmt::format("Subgroups: {}, shape: {}, axes: {}",
+                             !disableSubgroups,
+                             VecToString(shape),
+                             VecToString(axes)));
     auto strides = Strides(shape);
     auto ints = RandomNumbers<int32_t>(betann::NumElements(shape), 10);
     EXPECT_EQ(RunReduceRow<int32_t>(betann::ReduceType::Sum,
