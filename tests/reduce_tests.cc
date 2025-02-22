@@ -156,8 +156,7 @@ TEST_F(ReduceTests, ReduceAll) {
 }
 
 TEST_F(ReduceTests, ReduceLast) {
-  bool disableSubgroups = false;
-  // for (bool disableSubgroups : GetParameters()) {
+  for (bool disableSubgroups : GetParameters()) {
     const uint32_t shapes[][2] = {
       {1, 1},
       {5, 5},
@@ -176,7 +175,7 @@ TEST_F(ReduceTests, ReduceLast) {
                                        disableSubgroups),
                 Sum(ints, {M, K}, {K, 1}, {1}));
     }
-  // }
+  }
 }
 
 TEST_F(ReduceTests, ReduceRow) {
