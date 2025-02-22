@@ -164,6 +164,7 @@ TEST_F(ReduceTests, ReduceLast) {
       {32, 16},
       {33, 17},
       {33, 600},
+      {33, 800},
       {33, 1100},
     };
     for (auto [M, K] : shapes) {
