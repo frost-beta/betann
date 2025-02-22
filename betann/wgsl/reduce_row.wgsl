@@ -13,8 +13,10 @@ alias input_dtype = $input_dtype;
 
 const workgroup_size: u32 = $workgroup_size;
 const work_per_thread: u32 = 4;
-// The depth of loops to cache for coord_to_index_next.
-const coord_cache_size: u32 = $coord_cache_size;
+if ($use_fast_index) {
+  // The depth of loops to cache for coord_to_index_next.
+  const coord_cache_size: u32 = $coord_cache_size;
+}
 
 @group(0) @binding(0) var<storage, read_write> output: array<output_dtype>;
 @group(0) @binding(1) var<uniform> output_num_elements: u32;
@@ -80,64 +82,66 @@ fn thread_reduce_$op(total: ptr<function, output_dtype>,
   }
 }
 
-// Compute index faster by caching the results.
-struct coord_to_index_state {
-  contiguous: bool,
-  dim: array<u32, coord_cache_size>,
-  coord: array<u32, coord_cache_size>,
-  index: array<u32, coord_cache_size>,
-};
+if ($use_fast_index) {
+  // Compute index faster by caching the results.
+  struct coord_to_index_state {
+    contiguous: bool,
+    dim: array<u32, coord_cache_size>,
+    coord: array<u32, coord_cache_size>,
+    index: array<u32, coord_cache_size>,
+  };
 
-fn coord_to_index_init(state: ptr<function, coord_to_index_state>, ndim: u32) {
-  state.contiguous = ndim == 1;
-  for (var i = 0u; i < coord_cache_size; i++) {
-    state.dim[i] = max(ndim - i, 0);
-  }
-}
-
-fn coord_to_index_result(state: ptr<function, coord_to_index_state>) -> u32 {
-  return state.index[0];
-}
-
-fn coord_to_index_next(state: ptr<function, coord_to_index_state>,
-                       shape: ptr<storage, array<u32>>,
-                       strides: ptr<storage, array<u32>>) {
-  // Increase coordinate in last dimension, and carry to previous ones.
-  for (var i = 0u; i < coord_cache_size; i++) {
-    let dim = state.dim[i];
-    if (dim == 0) {  // unused cache entry
-      break;
+  fn coord_to_index_init(state: ptr<function, coord_to_index_state>, ndim: u32) {
+    state.contiguous = ndim == 1;
+    for (var i = 0u; i < coord_cache_size; i++) {
+      state.dim[i] = max(ndim - i, 0);
     }
-    if (i == coord_cache_size - 1) {  // the frist dimension
-      if (state.contiguous) {
-        state.index[i] += strides[0];
-      } else {
-        state.coord[i]++;
-        if (dim > 1) {
-          state.index[i] = coord_to_index_ndim(state.coord[i], shape, strides, i32(dim));
-        } else {
-          state.index[i] += strides[0];
-        }
-      }
-    } else {  // non-contiguous dimensions
-      state.coord[i]++;
-      state.index[i] += strides[dim - 1];
-      // Only continue the loop when need to carry to the N-1 dimension.
-      if (state.coord[i] < shape[dim - 1]) {
+  }
+
+  fn coord_to_index_result(state: ptr<function, coord_to_index_state>) -> u32 {
+    return state.index[0];
+  }
+
+  fn coord_to_index_next(state: ptr<function, coord_to_index_state>,
+                         shape: ptr<storage, array<u32>>,
+                         strides: ptr<storage, array<u32>>) {
+    // Increase coordinate in last dimension, and carry to previous ones.
+    for (var i = 0u; i < coord_cache_size; i++) {
+      let dim = state.dim[i];
+      if (dim == 0) {  // unused cache entry
         break;
       }
+      if (i == coord_cache_size - 1) {  // the frist dimension
+        if (state.contiguous) {
+          state.index[i] += strides[0];
+        } else {
+          state.coord[i]++;
+          if (dim > 1) {
+            state.index[i] = coord_to_index_ndim(state.coord[i], shape, strides, i32(dim));
+          } else {
+            state.index[i] += strides[0];
+          }
+        }
+      } else {  // non-contiguous dimensions
+        state.coord[i]++;
+        state.index[i] += strides[dim - 1];
+        // Only continue the loop when need to carry to the N-1 dimension.
+        if (state.coord[i] < shape[dim - 1]) {
+          break;
+        }
+      }
     }
-  }
-  // Iterate backwards and ignore first dimension.
-  for (var i = coord_cache_size - 2; i32(i) >= 0; i--) {
-    let dim = state.dim[i];
-    if (dim == 0) {
-      continue;
-    }
-    // Carry the index from N-1 dimension.
-    if (state.coord[i] >= shape[dim - 1]) {
-      state.coord[i] = 0;
-      state.index[i] = state.index[i + 1];
+    // Iterate backwards and ignore first dimension.
+    for (var i = coord_cache_size - 2; i32(i) >= 0; i--) {
+      let dim = state.dim[i];
+      if (dim == 0) {
+        continue;
+      }
+      // Carry the index from N-1 dimension.
+      if (state.coord[i] >= shape[dim - 1]) {
+        state.coord[i] = 0;
+        state.index[i] = state.index[i + 1];
+      }
     }
   }
 }

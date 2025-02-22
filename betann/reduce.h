@@ -24,7 +24,18 @@ void ReduceAll(Device& device,
                uint32_t inputNumElements,
                bool disableSubgroups = false);
 
-// Reduce input whose row is contiguous.
+// Reduce the last dimension in contiguous input.
+void ReduceLast(Device& device,
+                ReduceType type,
+                DataType outputDataType,
+                const Buffer& output,
+                uint32_t outputNumElements,
+                DataType inputDataType,
+                const Buffer& input,
+                uint32_t rowSize,
+                bool disableSubgroups = false);
+
+// Reduce contiguous rows of input.
 void ReduceRow(Device& device,
                ReduceType type,
                DataType outputDataType,

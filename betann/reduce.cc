@@ -128,6 +128,52 @@ void ReduceAll(Device& device,
   }
 }
 
+void ReduceLast(Device& device,
+                ReduceType type,
+                DataType outputDataType,
+                const Buffer& output,
+                uint32_t outputNumElements,
+                DataType inputDataType,
+                const Buffer& input,
+                uint32_t rowSize,
+                bool disableSubgroups) {
+  const char* op = ReduceTypeToString(type);
+  bool enableF16 = EnableF16(device, outputDataType, inputDataType);
+  auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
+
+  const uint32_t writePerThread = 4;
+  uint32_t workgroupSize;
+  if (rowSize <= 512)
+    workgroupSize = 32;
+  else if (rowSize <= 1024)
+    workgroupSize = 128;
+  else
+    workgroupSize = 256;
+  RunKernel(device,
+            fmt::format("reduce_last_{}", op),
+            fmt::format("reduce_last_{}_{}_{}_{}_{}",
+                        op,
+                        std::get<bool>(capacities["enable_subgroups"]),
+                        workgroupSize,
+                        WgslType(outputDataType),
+                        WgslType(inputDataType)),
+            [&]() {
+              return GetReduceShaderCode(wgsl_source_reduce_last,
+                                         op,
+                                         capacities,
+                                         outputDataType,
+                                         inputDataType,
+                                         workgroupSize);
+            },
+            {
+              output,
+              device.CreateBufferFromScalar(outputNumElements),
+              input,
+              device.CreateBufferFromScalar(rowSize),
+            },
+            {1, DivCeil(outputNumElements, writePerThread), 1});
+}
+
 void ReduceRow(Device& device,
                ReduceType type,
                DataType outputDataType,
@@ -155,7 +201,9 @@ void ReduceRow(Device& device,
       CollapseContiguousDims(nonReductionShape, nonReductionStrides);
 
   // Kernel options.
-  uint32_t workgroupSize = 128;  // TODO(zcbenz): make it dynamic
+  const char* op = ReduceTypeToString(type);
+  bool enableF16 = EnableF16(device, outputDataType, inputDataType);
+  auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
   uint32_t coordCacheSize;
   if (reductionShape.size() <= 1)
     coordCacheSize = 1;
@@ -163,21 +211,19 @@ void ReduceRow(Device& device,
     coordCacheSize = 2;
   else
     coordCacheSize = 5;
-  const char* op = ReduceTypeToString(type);
-  bool enableF16 = EnableF16(device, outputDataType, inputDataType);
-  auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
+  capacities["coord_cache_size"] = coordCacheSize;
   // FIXME(zcbenz): Enable for all after upstream fixes:
   // https://issues.chromium.org/issues/398275914
   bool useFastIndex =
       device.GetAdapterInfo().backendType != wgpu::BackendType::D3D11 &&
       device.GetAdapterInfo().backendType != wgpu::BackendType::D3D12;
   capacities["use_fast_index"] = useFastIndex;
-  capacities["coord_cache_size"] = coordCacheSize;
 
   // Kernel dispatch.
+  uint32_t workgroupSize = 128;  // TODO(zcbenz): make it dynamic
   RunKernel(device,
             fmt::format("reduce_row_small_{}", op),
-            fmt::format("reduce_row_{}_{}_{}_{}_{}_{}",
+            fmt::format("reduce_row_small_{}_{}_{}_{}_{}_{}",
                         op,
                         std::get<bool>(capacities["enable_subgroups"]),
                         workgroupSize,

@@ -26,6 +26,32 @@ class ReduceTests : public BetaNNTests {
   }
 
   template<typename T, typename U>
+  std::vector<T> RunReduceLast(betann::ReduceType type,
+                               const std::vector<U>& input,
+                               const std::vector<uint32_t>& shape,
+                               const std::vector<uint32_t>& axes,
+                               bool disableSubgroups = false) {
+    uint32_t outputNumElements =
+        betann::NumElements(betann::RemoveIndices(shape, axes));
+    uint32_t rowSize =
+        betann::NumElements(betann::KeepIndices(shape, axes));
+    betann::Buffer output = device_.CreateBuffer(
+        outputNumElements * sizeof(T),
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
+    betann::ReduceLast(device_,
+                       type,
+                       betann::GetDataType<T>(),
+                       output,
+                       outputNumElements,
+                       betann::GetDataType<U>(),
+                       device_.CreateBufferFromVector(input),
+                       rowSize,
+                       disableSubgroups);
+    device_.Flush();
+    return ReadFromBuffer<T>(output, outputNumElements);
+  }
+
+  template<typename T, typename U>
   std::vector<T> RunReduceRow(betann::ReduceType type,
                               const std::vector<U>& input,
                               const std::vector<uint32_t>& shape,
@@ -127,6 +153,30 @@ TEST_F(ReduceTests, ReduceAll) {
                                      disableSubgroups),
               true);
   }
+}
+
+TEST_F(ReduceTests, ReduceLast) {
+  bool disableSubgroups = false;
+  // for (bool disableSubgroups : GetParameters()) {
+    const uint32_t shapes[][2] = {
+      {1, 1},
+      {5, 5},
+      {31, 15},
+      {32, 16},
+      {33, 17},
+      {33, 600},
+      {33, 1100},
+    };
+    for (auto [M, K] : shapes) {
+      auto ints = RandomNumbers<int32_t>(M * K, 10);
+      SCOPED_TRACE(fmt::format("Subgroups: {}, Shape: {}x{}",
+                               !disableSubgroups, M, K));
+      EXPECT_EQ(RunReduceLast<int32_t>(betann::ReduceType::Sum,
+                                       ints, {M, K}, {1},
+                                       disableSubgroups),
+                Sum(ints, {M, K}, {K, 1}, {1}));
+    }
+  // }
 }
 
 TEST_F(ReduceTests, ReduceRow) {
