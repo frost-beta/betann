@@ -154,7 +154,7 @@ void ReduceRow(Device& device,
   std::tie(nonReductionShape, nonReductionStrides) =
       CollapseContiguousDims(nonReductionShape, nonReductionStrides);
 
-  // Kernel dispatch.
+  // Kernel options.
   uint32_t workgroupSize = 128;  // TODO(zcbenz): make it dynamic
   uint32_t coordCacheSize;
   if (reductionShape.size() <= 1)
@@ -166,6 +166,15 @@ void ReduceRow(Device& device,
   const char* op = ReduceTypeToString(type);
   bool enableF16 = EnableF16(device, outputDataType, inputDataType);
   auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
+  // FIXME(zcbenz): Enable for all after upstream fixes:
+  // https://issues.chromium.org/issues/398275914
+  bool useFastIndex =
+      device.GetAdapterInfo().backendType != wgpu::BackendType::D3D11 &&
+      device.GetAdapterInfo().backendType != wgpu::BackendType::D3D12;
+  capacities["use_fast_index"] = useFastIndex;
+  capacities["coord_cache_size"] = coordCacheSize;
+
+  // Kernel dispatch.
   RunKernel(device,
             fmt::format("reduce_row_small_{}", op),
             fmt::format("reduce_row_{}_{}_{}_{}_{}_{}",
@@ -176,7 +185,6 @@ void ReduceRow(Device& device,
                         WgslType(outputDataType),
                         WgslType(inputDataType)),
             [&]() {
-              capacities["coord_cache_size"] = coordCacheSize;
               return Append(GetReduceShaderCode(wgsl_source_reduce_row,
                                                 op,
                                                 capacities,

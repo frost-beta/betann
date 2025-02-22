@@ -32,10 +32,9 @@ Device::Device() {
       });
   instance_.WaitAny(future, 5 * 1000);
   // Check if there is a valid backend.
-  wgpu::AdapterInfo info;
-  if (adapter_.GetInfo(&info) != wgpu::Status::Success)
+  if (adapter_.GetInfo(&adapterInfo_) != wgpu::Status::Success)
     throw std::runtime_error("GetInfo failed.");
-  if (info.backendType == wgpu::BackendType::Null)
+  if (adapterInfo_.backendType == wgpu::BackendType::Null)
     throw std::runtime_error("There is no valid backend.");
   supportsF16_ = adapter_.HasFeature(wgpu::FeatureName::ShaderF16);
   supportsSubgroups_ = adapter_.HasFeature(wgpu::FeatureName::Subgroups);

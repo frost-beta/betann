@@ -115,6 +115,7 @@ class Device {
                  const wgpu::BindGroup& bindGroup,
                  Dims3 workgroupsCount);
 
+  const wgpu::AdapterInfo& GetAdapterInfo() const { return adapterInfo_; }
   const wgpu::Limits& GetLimits() const { return limits_; }
   bool SupportsF16() const { return supportsF16_; }
   bool SupportsSubgroups() const { return supportsSubgroups_; }
@@ -134,6 +135,7 @@ class Device {
   wgpu::Queue queue_;
 
   // Device capacity.
+  wgpu::AdapterInfo adapterInfo_;
   wgpu::Limits limits_;
   bool supportsF16_ = false;
   bool supportsSubgroups_ = false;

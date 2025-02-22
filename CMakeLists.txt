@@ -33,7 +33,7 @@ target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURC
 if (CMAKE_COMPILER_IS_GNUCC)
   target_compile_options(betann PUBLIC -Wno-return-type)
 elseif (MSVC)
-  target_compile_options(betann PUBLIC /wd4244 /wd4715)
+  target_compile_options(betann PUBLIC /EHsc /wd4244 /wd4715)
 endif()
 
 # Embed WGSL sources in binary.

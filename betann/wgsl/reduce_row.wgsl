@@ -35,16 +35,22 @@ fn reduce_row_small_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
   // The index in non-reduction dimensions.
   var input_offset = coord_to_index(gid.x, &non_reduction_shape, &non_reduction_strides);
 
-  // Stateful computation of index in reduction dimensions.
-  var index_state: coord_to_index_state;
-  coord_to_index_init(&index_state, arrayLength(&reduction_shape));
+  if ($use_fast_index) {
+    // Stateful computation of index in reduction dimensions.
+    var index_state: coord_to_index_state;
+    coord_to_index_init(&index_state, arrayLength(&reduction_shape));
+  }
 
   // Reduce by rows.
   var total = get_initial_value_$op();
   for (var r = 0u; r < non_row_reductions; r++) {
-    let row_offset = input_offset + coord_to_index_result(&index_state);
+    if ($use_fast_index) {
+      let row_offset = input_offset + coord_to_index_result(&index_state);
+      coord_to_index_next(&index_state, &reduction_shape, &reduction_strides);
+    } else {
+      let row_offset = input_offset + coord_to_index(r, &reduction_shape, &reduction_strides);
+    }
     thread_reduce_$op(&total, &input, row_offset, row_size, work_per_thread);
-    coord_to_index_next(&index_state, &reduction_shape, &reduction_strides);
   }
 
   output[gid.x] = total;
@@ -85,7 +91,7 @@ struct coord_to_index_state {
 fn coord_to_index_init(state: ptr<function, coord_to_index_state>, ndim: u32) {
   state.contiguous = ndim == 1;
   for (var i = 0u; i < coord_cache_size; i++) {
-    state.dim[i] = ndim - i;
+    state.dim[i] = max(ndim - i, 0);
   }
 }
 
