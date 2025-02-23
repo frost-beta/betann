@@ -52,33 +52,24 @@ fn reduce_row_1d_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
     } else {
       let row_offset = input_offset + coord_to_index(r, &reduction_shape, &reduction_strides);
     }
-
-    for (var block = 0u; block < row_size / work_per_thread; block++) {
-      var vals: array<input_dtype, work_per_thread>;
-      for (var i = 0u; i < work_per_thread; i++) {
-        vals[i] = input[row_offset + block * work_per_thread + i];
-      }
-      for (var i = 0u; i < work_per_thread; i++) {
-        total = reduce_op_$op(output_dtype(vals[i]), total);
-      }
-    }
-
-    let leftover = row_size % work_per_thread;
-    if (leftover != 0) {
-      let idx = row_size - leftover;
-      for (var i = 0u; i < work_per_thread && idx + i < row_size; i++) {
-        total = reduce_op_$op(output_dtype(input[row_offset + idx + i]), total);
-      }
-    }
+    row_reduce(&total, 0, &input, row_offset, row_size, 1, work_per_thread);
   }
 
   output[gid.x] = total;
 }
 
-var<workgroup> workgroup_totals: array<output_dtype, workgroup_size>;
+if ($enable_subgroups) {
+  var<workgroup> workgroup_totals: array<output_dtype, workgroup_size / $subgroup_min_size>;
+} else {
+  var<workgroup> workgroup_totals: array<output_dtype, workgroup_size>;
+}
 
 @compute @workgroup_size(workgroup_size, 1, 1)
-fn reduce_row_2d_$op(@builtin(global_invocation_id) gid: vec3<u32>,
+fn reduce_row_2d_$op(if ($enable_subgroups) {
+                       @builtin(subgroup_size) subgroup_size: u32,
+                       @builtin(subgroup_invocation_id) subgroup_gid: u32,
+                     }
+                     @builtin(global_invocation_id) gid: vec3<u32>,
                      @builtin(local_invocation_id) lid: vec3<u32>) {
   // The index in non-reduction dimensions.
   var input_offset = coord_to_index(gid.y, &non_reduction_shape, &non_reduction_strides);
@@ -98,38 +89,19 @@ fn reduce_row_2d_$op(@builtin(global_invocation_id) gid: vec3<u32>,
     } else {
       let row_offset = input_offset + coord_to_index(r, &reduction_shape, &reduction_strides);
     }
-
-    const block_size = workgroup_size * work_per_thread;
-    for (var block = 0u; block < row_size / block_size; block++) {
-      let idx = block * block_size + lid.x * work_per_thread;
-      for (var i = 0u; i < work_per_thread; i++) {
-        total = reduce_op_$op(output_dtype(input[row_offset + idx + i]), total);
-      }
-    }
-
-    let leftover = row_size % block_size;
-    if (leftover != 0) {
-      let idx = (row_size - leftover) + lid.x * work_per_thread;
-      for (var i = 0u; i < work_per_thread && idx + i < row_size; i++) {
-        total = reduce_op_$op(output_dtype(input[row_offset + idx + i]), total);
-      }
-    }
+    row_reduce(&total, lid.x, &input, row_offset, row_size, workgroup_size, work_per_thread);
   }
 
   // Reduce across the workgroup.
-  workgroup_totals[lid.x] = total;
-  workgroupBarrier();
-  for (var delta = workgroup_size / 2; delta >= 1; delta >>= 1) {
-    if (lid.x < delta) {
-      workgroup_totals[lid.x] = reduce_op_$op(workgroup_totals[lid.x],
-                                              workgroup_totals[lid.x + delta]);
-    }
-    workgroupBarrier();
+  if ($enable_subgroups) {
+    workgroup_reduce(&total, lid.x, workgroup_size, subgroup_gid, subgroup_size);
+  } else {
+    workgroup_reduce(&total, lid.x, workgroup_size, 0, 0);
   }
 
   // Write output.
   if (lid.x == 0 && gid.y < output_num_elements) {
-    output[gid.y] = workgroup_totals[0];
+    output[gid.y] = total;
   }
 }
 
