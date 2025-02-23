@@ -26,6 +26,15 @@ const char* ReduceTypeToString(ReduceType type) {
   }
 }
 
+uint32_t RowThreadsForRowSize(uint32_t rowSize) {
+  if (rowSize <= 512)
+    return 32;
+  else if (rowSize <= 1024)
+    return 128;
+  else
+    return 256;
+}
+
 std::string GetReduceShaderCode(const char* source,
                                 const char* op,
                                 const VariablesMap& capacities,
@@ -142,13 +151,7 @@ void ReduceLast(Device& device,
   auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
 
   const uint32_t writePerThread = 4;
-  uint32_t workgroupSize;
-  if (rowSize <= 512)
-    workgroupSize = 32;
-  else if (rowSize <= 1024)
-    workgroupSize = 128;
-  else
-    workgroupSize = 256;
+  const uint32_t workgroupSize = RowThreadsForRowSize(rowSize);
   RunKernel(device,
             fmt::format("reduce_last_{}", op),
             fmt::format("reduce_last_{}_{}_{}_{}_{}",
@@ -219,11 +222,23 @@ void ReduceRow(Device& device,
       device.GetAdapterInfo().backendType != wgpu::BackendType::D3D12;
   capacities["use_fast_index"] = useFastIndex;
 
+  const char* entry;
+  uint32_t workgroupSize;
+  Dims3 workgroupCount;
+  if (rowSize <= 64) {
+    entry = "reduce_row_1d";
+    workgroupSize = 128;  // TODO(zcbenz): make it dynamic
+    workgroupCount.x = DivCeil(outputNumElements, workgroupSize);
+  } else {
+    entry = "reduce_row_2d";
+    workgroupSize = RowThreadsForRowSize(rowSize);
+    workgroupCount.y = outputNumElements;
+  }
+
   // Kernel dispatch.
-  uint32_t workgroupSize = 128;  // TODO(zcbenz): make it dynamic
   RunKernel(device,
-            fmt::format("reduce_row_small_{}", op),
-            fmt::format("reduce_row_small_{}_{}_{}_{}_{}_{}",
+            fmt::format("{}_{}", entry, op),
+            fmt::format("reduce_row_{}_{}_{}_{}_{}_{}",
                         op,
                         std::get<bool>(capacities["enable_subgroups"]),
                         workgroupSize,
@@ -258,9 +273,7 @@ void ReduceRow(Device& device,
                   ? device.CreateBufferFromScalar(0u)
                   : device.CreateBufferFromVector(reductionStrides),
             },
-            {
-              DivCeil(outputNumElements, workgroupSize),
-            });
+            workgroupCount);
 }
 
 }  // namespace betann

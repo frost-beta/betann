@@ -182,12 +182,16 @@ TEST_F(ReduceTests, ReduceLast) {
 TEST_F(ReduceTests, ReduceRow) {
   const bool disableSubgroups = true;
   const std::tuple<std::vector<uint32_t>, std::vector<uint32_t>> shapes[] = {
+    {{31, 65}, {1}},
+    {{31, 65}, {0, 1}},
     {{31, 127}, {1}},
     {{31, 127}, {0, 1}},
     {{32, 128}, {1}},
     {{32, 128}, {0, 1}},
     {{33, 129}, {1}},
     {{33, 129}, {0, 1}},
+    {{33, 520}, {1}},
+    {{33, 1100}, {1}},
     {{31, 127, 127}, {2}},
     {{31, 127, 127}, {1, 2}},
     {{33, 33, 33, 4}, {3}},

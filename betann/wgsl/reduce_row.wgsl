@@ -29,7 +29,7 @@ if ($use_fast_index) {
 @group(0) @binding(8) var<storage, read> reduction_strides: array<u32>;
 
 @compute @workgroup_size(workgroup_size, 1, 1)
-fn reduce_row_small_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
+fn reduce_row_1d_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (gid.x >= output_num_elements) {
     return;
   }
@@ -52,33 +52,84 @@ fn reduce_row_small_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
     } else {
       let row_offset = input_offset + coord_to_index(r, &reduction_shape, &reduction_strides);
     }
-    thread_reduce_$op(&total, &input, row_offset, row_size, work_per_thread);
+
+    for (var block = 0u; block < row_size / work_per_thread; block++) {
+      var vals: array<input_dtype, work_per_thread>;
+      for (var i = 0u; i < work_per_thread; i++) {
+        vals[i] = input[row_offset + block * work_per_thread + i];
+      }
+      for (var i = 0u; i < work_per_thread; i++) {
+        total = reduce_op_$op(output_dtype(vals[i]), total);
+      }
+    }
+
+    let leftover = row_size % work_per_thread;
+    if (leftover != 0) {
+      let idx = row_size - leftover;
+      for (var i = 0u; i < work_per_thread && idx + i < row_size; i++) {
+        total = reduce_op_$op(output_dtype(input[row_offset + idx + i]), total);
+      }
+    }
   }
 
   output[gid.x] = total;
 }
 
-fn thread_reduce_$op(total: ptr<function, output_dtype>,
-                     input: ptr<storage, array<input_dtype>>,
-                     row_offset: u32,
-                     row_size: u32,
-                     block_size: u32) {
-  for (var block = 0u; block < row_size / block_size; block++) {
-    var vals: array<input_dtype, work_per_thread>;
-    for (var i = 0u; i < block_size; i++) {
-      vals[i] = input[row_offset + block * block_size + i];
+var<workgroup> workgroup_totals: array<output_dtype, workgroup_size>;
+
+@compute @workgroup_size(workgroup_size, 1, 1)
+fn reduce_row_2d_$op(@builtin(global_invocation_id) gid: vec3<u32>,
+                     @builtin(local_invocation_id) lid: vec3<u32>) {
+  // The index in non-reduction dimensions.
+  var input_offset = coord_to_index(gid.y, &non_reduction_shape, &non_reduction_strides);
+
+  if ($use_fast_index) {
+    // Stateful computation of index in reduction dimensions.
+    var index_state: coord_to_index_state;
+    coord_to_index_init(&index_state, arrayLength(&reduction_shape));
+  }
+
+  // Reduce rows per thread.
+  var total = get_initial_value_$op();
+  for (var r = 0u; r < non_row_reductions; r++) {
+    if ($use_fast_index) {
+      let row_offset = input_offset + coord_to_index_result(&index_state);
+      coord_to_index_next(&index_state, &reduction_shape, &reduction_strides);
+    } else {
+      let row_offset = input_offset + coord_to_index(r, &reduction_shape, &reduction_strides);
     }
-    for (var i = 0u; i < block_size; i++) {
-      *total = reduce_op_$op(vals[i], *total);
+
+    const block_size = workgroup_size * work_per_thread;
+    for (var block = 0u; block < row_size / block_size; block++) {
+      let idx = block * block_size + lid.x * work_per_thread;
+      for (var i = 0u; i < work_per_thread; i++) {
+        total = reduce_op_$op(output_dtype(input[row_offset + idx + i]), total);
+      }
+    }
+
+    let leftover = row_size % block_size;
+    if (leftover != 0) {
+      let idx = (row_size - leftover) + lid.x * work_per_thread;
+      for (var i = 0u; i < work_per_thread && idx + i < row_size; i++) {
+        total = reduce_op_$op(output_dtype(input[row_offset + idx + i]), total);
+      }
     }
   }
 
-  let leftover = row_size % block_size;
-  if (leftover != 0) {
-    let idx = row_size - leftover;
-    for (var i = 0u; i < block_size && idx + i < row_size; i++) {
-      *total = reduce_op_$op(output_dtype(input[row_offset + idx + i]), *total);
+  // Reduce across the workgroup.
+  workgroup_totals[lid.x] = total;
+  workgroupBarrier();
+  for (var delta = workgroup_size / 2; delta >= 1; delta >>= 1) {
+    if (lid.x < delta) {
+      workgroup_totals[lid.x] = reduce_op_$op(workgroup_totals[lid.x],
+                                              workgroup_totals[lid.x + delta]);
     }
+    workgroupBarrier();
+  }
+
+  // Write output.
+  if (lid.x == 0 && gid.y < output_num_elements) {
+    output[gid.y] = workgroup_totals[0];
   }
 }
 
@@ -92,7 +143,7 @@ if ($use_fast_index) {
   };
 
   fn coord_to_index_init(state: ptr<function, coord_to_index_state>, ndim: u32) {
-    state.contiguous = ndim == 1;
+    state.contiguous = ndim < 2;
     for (var i = 0u; i < coord_cache_size; i++) {
       state.dim[i] = max(ndim - i, 0);
     }
