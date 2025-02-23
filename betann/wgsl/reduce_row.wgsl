@@ -19,7 +19,7 @@ if ($use_fast_index) {
 }
 
 @group(0) @binding(0) var<storage, read_write> output: array<output_dtype>;
-@group(0) @binding(1) var<uniform> output_num_elements: u32;
+@group(0) @binding(1) var<uniform> num_outputs: u32;
 @group(0) @binding(2) var<storage, read> input: array<input_dtype>;
 @group(0) @binding(3) var<uniform> row_size: u32;
 @group(0) @binding(4) var<uniform> non_row_reductions: u32;
@@ -30,7 +30,7 @@ if ($use_fast_index) {
 
 @compute @workgroup_size(workgroup_size, 1, 1)
 fn reduce_row_1d_$op(@builtin(global_invocation_id) gid: vec3<u32>) {
-  if (gid.x >= output_num_elements) {
+  if (gid.x >= num_outputs) {
     return;
   }
 
@@ -100,7 +100,7 @@ fn reduce_row_2d_$op(if ($enable_subgroups) {
   }
 
   // Write output.
-  if (lid.x == 0 && gid.y < output_num_elements) {
+  if (lid.x == 0 && gid.y < num_outputs) {
     output[gid.y] = total;
   }
 }

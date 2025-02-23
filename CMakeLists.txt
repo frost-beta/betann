@@ -49,6 +49,7 @@ set(BETANN_WGSL_SOURCES betann/wgsl/arange.wgsl
                         betann/wgsl/gemvt.wgsl
                         betann/wgsl/random.wgsl
                         betann/wgsl/reduce_all.wgsl
+                        betann/wgsl/reduce_none.wgsl
                         betann/wgsl/reduce_last.wgsl
                         betann/wgsl/reduce_ops.wgsl
                         betann/wgsl/reduce_row.wgsl

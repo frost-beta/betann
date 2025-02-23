@@ -80,6 +80,21 @@ class ReduceTests : public BetaNNTests {
     return ReadFromBuffer<T>(output, outputNumElements);
   }
 
+  template<typename T>
+  std::vector<T> RunReduceNone(betann::ReduceType type,
+                               uint32_t outputNumElements) {
+    betann::Buffer output = device_.CreateBuffer(
+        betann::DivCeil(outputNumElements, 4u) * 4 * sizeof(T),
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
+    betann::ReduceNone(device_,
+                       type,
+                       betann::GetDataType<T>(),
+                       output,
+                       outputNumElements);
+    device_.Flush();
+    return ReadFromBuffer<T>(output, outputNumElements);
+  }
+
   std::vector<uint32_t> Strides(const std::vector<uint32_t>& shape) {
     std::vector<uint32_t> strides(shape.size());
     uint32_t size = 1;
@@ -180,35 +195,52 @@ TEST_F(ReduceTests, ReduceLast) {
 }
 
 TEST_F(ReduceTests, ReduceRow) {
-  const bool disableSubgroups = true;
-  const std::tuple<std::vector<uint32_t>, std::vector<uint32_t>> shapes[] = {
-    {{31, 65}, {1}},
-    {{31, 65}, {0, 1}},
-    {{31, 127}, {1}},
-    {{31, 127}, {0, 1}},
-    {{32, 128}, {1}},
-    {{32, 128}, {0, 1}},
-    {{33, 129}, {1}},
-    {{33, 129}, {0, 1}},
-    {{33, 520}, {1}},
-    {{33, 1100}, {1}},
-    {{31, 127, 127}, {2}},
-    {{31, 127, 127}, {1, 2}},
-    {{33, 33, 33, 4}, {3}},
-    {{33, 33, 33, 4}, {2, 3}},
-    {{33, 33, 33, 4}, {1, 2, 3}},
-    {{7, 7, 7, 7, 7, 7}, {1, 2, 3, 4, 5}},
-  };
-  for (const auto& [shape, axes] : shapes) {
-    SCOPED_TRACE(fmt::format("Subgroups: {}, shape: {}, axes: {}",
-                             !disableSubgroups,
-                             VecToString(shape),
-                             VecToString(axes)));
-    auto strides = Strides(shape);
-    auto ints = RandomNumbers<int32_t>(betann::NumElements(shape), 10);
-    EXPECT_EQ(RunReduceRow<int32_t>(betann::ReduceType::Sum,
-                                    ints, shape, strides, axes,
-                                    disableSubgroups),
-              Sum(ints, shape, strides, axes));
+  for (bool disableSubgroups : GetParameters()) {
+    const std::tuple<std::vector<uint32_t>, std::vector<uint32_t>> shapes[] = {
+      {{31, 65}, {1}},
+      {{31, 65}, {0, 1}},
+      {{31, 127}, {1}},
+      {{31, 127}, {0, 1}},
+      {{32, 128}, {1}},
+      {{32, 128}, {0, 1}},
+      {{33, 129}, {1}},
+      {{33, 129}, {0, 1}},
+      {{33, 520}, {1}},
+      {{33, 1100}, {1}},
+      {{31, 127, 127}, {2}},
+      {{31, 127, 127}, {1, 2}},
+      {{33, 33, 33, 4}, {3}},
+      {{33, 33, 33, 4}, {2, 3}},
+      {{33, 33, 33, 4}, {1, 2, 3}},
+      {{7, 7, 7, 7, 7, 7}, {1, 2, 3, 4, 5}},
+    };
+    for (const auto& [shape, axes] : shapes) {
+      SCOPED_TRACE(fmt::format("Subgroups: {}, shape: {}, axes: {}",
+                               !disableSubgroups,
+                               VecToString(shape),
+                               VecToString(axes)));
+      auto strides = Strides(shape);
+      auto ints = RandomNumbers<int32_t>(betann::NumElements(shape), 10);
+      EXPECT_EQ(RunReduceRow<int32_t>(betann::ReduceType::Sum,
+                                      ints, shape, strides, axes,
+                                      disableSubgroups),
+                Sum(ints, shape, strides, axes));
+    }
+  }
+}
+
+TEST_F(ReduceTests, ReduceNone) {
+  const uint32_t sizes[] = {1, 31, 32, 33, 127, 128, 129};
+  for (uint32_t size : sizes) {
+    EXPECT_EQ(RunReduceNone<int32_t>(betann::ReduceType::Sum, size),
+              (std::vector<int32_t>(size, 0)));
+    EXPECT_EQ(RunReduceNone<uint32_t>(betann::ReduceType::Prod, size),
+              (std::vector<uint32_t>(size, 1)));
+    EXPECT_EQ(RunReduceNone<uint32_t>(betann::ReduceType::And, size),
+              (std::vector<uint32_t>(size, true)));
+    if (device_.SupportsF16()) {
+      EXPECT_EQ(RunReduceNone<uint16_t>(betann::ReduceType::Prod, size),
+                (std::vector<uint16_t>(size, betann::Float32ToFloat16(1))));
+    }
   }
 }

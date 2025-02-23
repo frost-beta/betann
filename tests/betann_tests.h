@@ -11,10 +11,8 @@ class BetaNNTests : public testing::Test {
     std::vector<T> out(size);
     device_.WaitFor(device_.ReadBuffer(
         buf,
-        [&](const void* data, uint64_t size, uint64_t offset) {
-          std::memcpy(out.data(),
-                      static_cast<const char*>(data) + offset,
-                      size);
+        [&](const void* data, uint64_t, uint64_t) {
+          std::memcpy(out.data(), data, size * sizeof(T));
         }));
     return out;
   }

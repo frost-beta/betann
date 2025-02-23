@@ -50,6 +50,13 @@ void ReduceRow(Device& device,
                std::vector<uint32_t> reductionStrides,
                bool disableSubgroups = false);
 
+// Write initial values to output.
+void ReduceNone(Device& device,
+                ReduceType type,
+                DataType outputDataType,
+                const Buffer& output,
+                uint32_t outputNumElements);
+
 template<typename T>
 std::vector<T> RemoveIndices(const std::vector<T>& vec,
                              const std::vector<uint32_t>& indices) {

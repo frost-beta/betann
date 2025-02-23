@@ -40,7 +40,8 @@ std::string GetReduceShaderCode(const char* source,
                                 const VariablesMap& capacities,
                                 DataType outputDataType,
                                 DataType inputDataType,
-                                uint32_t workgroupSize) {
+                                uint32_t workgroupSize,
+                                bool useReduceUtilies = true) {
   return Append(
       ParseTemplate(
           source,
@@ -62,6 +63,7 @@ std::string GetReduceShaderCode(const char* source,
           {
             {"op", op},
             {"output_dtype", WgslType(outputDataType)},
+            {"use_reduce_utilities", useReduceUtilies},
           },
           capacities));
 }
@@ -274,6 +276,39 @@ void ReduceRow(Device& device,
                   : device.CreateBufferFromVector(reductionStrides),
             },
             workgroupCount);
+}
+
+void ReduceNone(Device& device,
+                ReduceType type,
+                DataType outputDataType,
+                const Buffer& output,
+                uint32_t outputNumElements) {
+  const char* op = ReduceTypeToString(type);
+  const uint32_t workgroupSize = 64;
+  RunKernel(device,
+            fmt::format("reduce_none_{}", op),
+            fmt::format("reduce_none_{}_{}_{}",
+                        op,
+                        workgroupSize,
+                        WgslType(outputDataType)),
+            [&]() {
+              return GetReduceShaderCode(
+                  wgsl_source_reduce_none,
+                  op,
+                  {
+                    {"enable_f16", EnableF16(device, outputDataType)},
+                    {"enable_subgroups", false},
+                  },
+                  outputDataType,
+                  outputDataType,
+                  workgroupSize,
+                  false);
+            },
+            {
+              output,
+              device.CreateBufferFromScalar(outputNumElements),
+            },
+            {DivCeil(outputNumElements, workgroupSize)});
 }
 
 }  // namespace betann
