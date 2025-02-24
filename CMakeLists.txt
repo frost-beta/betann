@@ -26,6 +26,7 @@ target_sources(betann PRIVATE betann/device.cc
                                    betann/math.h
                                    betann/matmul.h
                                    betann/kernels.h
+                                   betann/reduce.h
                                    betann/utils.h)
 target_include_directories(betann PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
                                          $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>

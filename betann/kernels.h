@@ -111,6 +111,41 @@ void RandomBitsGeneral(Device& device,
                        const std::vector<uint32_t>& keysShape,
                        const std::vector<uint32_t>& keysStrides);
 
+enum class ReductionPlanType {
+  ReduceAll,
+  ReduceRow,
+  ReduceCol,
+  ReduceGeneral,
+};
+
+struct ReductionPlan {
+  ReductionPlanType type;
+  std::vector<uint32_t> reductionShape;
+  std::vector<uint32_t> reductionStrides;
+};
+
+enum class ReduceType {
+  And,
+  Or,
+  Sum,
+  Prod,
+  Min,
+  Max
+};
+
+void Reduce(Device& device,
+            ReductionPlan plan,
+            ReduceType type,
+            DataType outputDataType,
+            const Buffer& output,
+            uint32_t outputNumElements,
+            DataType inputDataType,
+            const Buffer& input,
+            uint32_t inputNumElements,
+            const std::vector<uint32_t>& inputShape,
+            const std::vector<uint32_t>& inputStrides,
+            const std::vector<uint32_t>& reductionAxes);
+
 // Maximum number of elements can sort in one block.
 uint32_t SortBlockSize();
 

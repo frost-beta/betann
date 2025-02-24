@@ -9,7 +9,7 @@ namespace betann {
 
 namespace {
 
-const char* ReduceTypeToString(ReduceType type) {
+const char* ReduceTypeToString(ReduceType type, DataType dataType) {
   switch (type) {
     case ReduceType::And:
       return "and";
@@ -20,9 +20,9 @@ const char* ReduceTypeToString(ReduceType type) {
     case ReduceType::Prod:
       return "prod";
     case ReduceType::Min:
-      return "min";
+      return dataType == DataType::Bool ? "and" : "min";
     case ReduceType::Max:
-      return "max";
+      return dataType == DataType::Bool ? "and" : "max";
   }
 }
 
@@ -86,7 +86,7 @@ void ReduceAll(Device& device,
                        uint32_t workgroupSize,
                        uint32_t rowSize,
                        uint32_t numRows) {
-    const char* op = ReduceTypeToString(type);
+    const char* op = ReduceTypeToString(type, outputDataType);
     bool enableF16 = EnableF16(device, outputDataType, inputDataType);
     auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
     RunKernel(device,
@@ -148,7 +148,7 @@ void ReduceLast(Device& device,
                 const Buffer& input,
                 uint32_t rowSize,
                 bool disableSubgroups) {
-  const char* op = ReduceTypeToString(type);
+  const char* op = ReduceTypeToString(type, outputDataType);
   bool enableF16 = EnableF16(device, outputDataType, inputDataType);
   auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
 
@@ -206,7 +206,7 @@ void ReduceRow(Device& device,
       CollapseContiguousDims(nonReductionShape, nonReductionStrides);
 
   // Kernel options.
-  const char* op = ReduceTypeToString(type);
+  const char* op = ReduceTypeToString(type, outputDataType);
   bool enableF16 = EnableF16(device, outputDataType, inputDataType);
   auto capacities = GetCapacityVariables(device, enableF16, disableSubgroups);
   uint32_t coordCacheSize;
@@ -283,7 +283,7 @@ void ReduceNone(Device& device,
                 DataType outputDataType,
                 const Buffer& output,
                 uint32_t outputNumElements) {
-  const char* op = ReduceTypeToString(type);
+  const char* op = ReduceTypeToString(type, outputDataType);
   const uint32_t workgroupSize = 64;
   RunKernel(device,
             fmt::format("reduce_none_{}", op),
@@ -309,6 +309,37 @@ void ReduceNone(Device& device,
               device.CreateBufferFromScalar(outputNumElements),
             },
             {DivCeil(outputNumElements, workgroupSize)});
+}
+
+void Reduce(Device& device,
+            ReductionPlan plan,
+            ReduceType type,
+            DataType outputDataType,
+            const Buffer& output,
+            uint32_t outputNumElements,
+            DataType inputDataType,
+            const Buffer& input,
+            uint32_t inputNumElements,
+            const std::vector<uint32_t>& inputShape,
+            const std::vector<uint32_t>& inputStrides,
+            const std::vector<uint32_t>& reductionAxes) {
+  if (inputNumElements == 0) {
+    return ReduceNone(device, type, outputDataType, output, outputNumElements);
+  }
+  if (plan.type == ReductionPlanType::ReduceAll) {
+    return ReduceAll(device, type,
+                     outputDataType, output,
+                     inputDataType, input, inputNumElements);
+  }
+  if (plan.type == ReductionPlanType::ReduceRow) {
+    return ReduceRow(device, type,
+                     outputDataType, output, outputNumElements,
+                     inputDataType, input, inputShape, inputStrides,
+                     reductionAxes,
+                     std::move(plan.reductionShape),
+                     std::move(plan.reductionStrides));
+  }
+  throw std::runtime_error("Non-row-contiguous reduce is not implemented.");
 }
 
 }  // namespace betann

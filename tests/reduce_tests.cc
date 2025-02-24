@@ -95,6 +95,39 @@ class ReduceTests : public BetaNNTests {
     return ReadFromBuffer<T>(output, outputNumElements);
   }
 
+  template<typename T, typename U>
+  std::vector<T> RunReduce(betann::ReductionPlanType planType,
+                           betann::ReduceType type,
+                           const std::vector<U>& input,
+                           const std::vector<uint32_t>& shape,
+                           const std::vector<uint32_t>& strides,
+                           const std::vector<uint32_t>& axes) {
+    uint32_t outputNumElements =
+        betann::NumElements(betann::RemoveIndices(shape, axes));
+    betann::Buffer output = device_.CreateBuffer(
+        outputNumElements * sizeof(T),
+        betann::BufferUsage::Storage | betann::BufferUsage::CopySrc);
+    betann::ReductionPlan plan = {
+      planType,
+      betann::KeepIndices(shape, axes),
+      betann::KeepIndices(strides, axes),
+    };
+    betann::Reduce(device_,
+                   std::move(plan),
+                   type,
+                   betann::GetDataType<T>(),
+                   output,
+                   outputNumElements,
+                   betann::GetDataType<U>(),
+                   device_.CreateBufferFromVector(input),
+                   input.size(),
+                   shape,
+                   strides,
+                   axes);
+    device_.Flush();
+    return ReadFromBuffer<T>(output, outputNumElements);
+  }
+
   std::vector<uint32_t> Strides(const std::vector<uint32_t>& shape) {
     std::vector<uint32_t> strides(shape.size());
     uint32_t size = 1;
@@ -243,4 +276,24 @@ TEST_F(ReduceTests, ReduceNone) {
                 (std::vector<uint16_t>(size, betann::Float32ToFloat16(1))));
     }
   }
+}
+
+TEST_F(ReduceTests, Reduce) {
+  EXPECT_EQ(RunReduce<float>(betann::ReductionPlanType::ReduceAll,
+                             betann::ReduceType::Prod,
+                             std::vector<int32_t>(), {}, {}, {}),
+            (std::vector<float>{1}));
+  auto a = RandomNumbers<int32_t>(10);
+  EXPECT_EQ(RunReduce<float>(betann::ReductionPlanType::ReduceAll,
+                             betann::ReduceType::Sum,
+                             a, {}, {}, {}),
+            (std::vector<float>{std::accumulate(a.begin(), a.end(), 0.f)}));
+  EXPECT_EQ(RunReduce<int32_t>(betann::ReductionPlanType::ReduceRow,
+                               betann::ReduceType::Sum,
+                               a, {10}, {1}, {0}),
+            Sum(a, {10}, {1}, {0}));
+  EXPECT_EQ(RunReduce<int32_t>(betann::ReductionPlanType::ReduceRow,
+                               betann::ReduceType::Sum,
+                               a, {2, 5}, {5, 1}, {1}),
+            Sum(a, {2, 5}, {5, 1}, {1}));
 }

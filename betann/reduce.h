@@ -1,18 +1,9 @@
 #ifndef BETANN_REDUCE_H_
 #define BETANN_REDUCE_H_
 
-#include "betann/device.h"
+#include "betann/kernels.h"
 
 namespace betann {
-
-enum class ReduceType {
-  And,
-  Or,
-  Sum,
-  Prod,
-  Min,
-  Max
-};
 
 // Reduce contiguous input to one output.
 void ReduceAll(Device& device,
